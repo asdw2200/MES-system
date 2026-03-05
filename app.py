@@ -74,7 +74,7 @@ def append_incoming_data(new_row):
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XIF7Z1tlQQV7zFUql5gjv-veBgltjm0Hb2vflEo8" 
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     doc = client.open_by_url(sheet_url)
     sheet_incoming = doc.worksheet("수입검사일지")
     sheet_incoming.append_row(new_row)
@@ -336,4 +336,5 @@ elif menu == "📥 수입자재 검사대기":
             st.warning("⚠️ 실제 검사를 완료하신 후, 구글 시트에서 [진행상태]를 '완료'로 변경하시면 알람이 해제됩니다.")
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
