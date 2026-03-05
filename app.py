@@ -9,20 +9,19 @@ import os
 from datetime import datetime, timedelta
 
 # 1. 페이지 설정
-st.set_page_config(page_title="사출 품질관리 시스템", page_icon="🏭", layout="wide")
+st.set_page_config(page_title="사출 품질 MES 시스템", page_icon="🏭", layout="wide")
 
-# --- 🚀 데이터 로드 ---
-@st.cache_data(ttl=10)
+# --- 🚀 1. 데이터 로드 함수 (읽기 전용, 캐시 적용) ---
+@st.cache_data(ttl=5) 
 def load_all_data():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # 클라우드 환경의 '비밀 금고'에서 구글 시트 인증키를 가져옵니다.
-    creds_dict = dict(st.secrets["gcp_service_account"]) 
+    creds_dict = dict(st.secrets["gcp_service_account"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XIF7Z1tlQQV7zFUql5gjv-veBgltjm0Hb2vflEo8" 
     doc = client.open_by_url(sheet_url)
     
-    # [1] 검사 데이터 로드 및 정제
+    # [1] 검사 데이터
     sheet1 = doc.get_worksheet(0) 
     data1 = sheet1.get_all_values()
     df = pd.DataFrame(data1[1:], columns=data1[0]) if len(data1) > 1 else pd.DataFrame()
@@ -30,8 +29,8 @@ def load_all_data():
         df = df[df["품번"].str.strip() != ""] 
         df["검사일자_dt"] = pd.to_datetime(df["검사일자"], errors='coerce')
         df = df.dropna(subset=["검사일자_dt"])
-    
-    # [2] 기준정보 로드
+
+    # [2] 기준정보
     try:
         sheet_master = doc.worksheet("기준정보")
         data_master = sheet_master.get_all_values()
@@ -39,7 +38,7 @@ def load_all_data():
     except:
         df_master = pd.DataFrame()
 
-    # [3] 계측기 관리 데이터 로드
+    # [3] 계측기 관리
     try:
         sheet_tool = doc.worksheet("계측기관리")
         data_tool = sheet_tool.get_all_values()
@@ -47,21 +46,31 @@ def load_all_data():
     except:
         df_tool = pd.DataFrame()
 
-    # [4] 🔥 수입검사일지 로드 (비어있어도 헤더는 살리도록 수정)
+    # [4] 수입검사일지 (품질팀 직접 관리)
     try:
         sheet_incoming = doc.worksheet("수입검사일지") 
         data_incoming = sheet_incoming.get_all_values()
-        # 데이터가 1줄(헤더)이라도 있으면 컬럼을 만들어서 판다스에 넣음!
         if len(data_incoming) > 0:
             df_incoming = pd.DataFrame(data_incoming[1:], columns=data_incoming[0])
         else:
             df_incoming = pd.DataFrame()
-    except Exception as e:
+    except:
         df_incoming = pd.DataFrame()
 
     return df, df_master, df_tool, df_incoming
 
-# --- 📄 PDF 생성 함수 ---
+# --- 🚀 2. 구글 시트 데이터 쓰기 함수 (캐시 에러 방지용) ---
+def append_incoming_data(new_row):
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XIF7Z1tlQQV7zFUql5gjv-veBgltjm0Hb2vflEo8" 
+    doc = client.open_by_url(sheet_url)
+    sheet_incoming = doc.worksheet("수입검사일지")
+    sheet_incoming.append_row(new_row)
+
+# --- 📄 3. PDF 생성 함수 ---
 def create_report_pdf(dataframe, date_label, part_info):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
@@ -116,10 +125,10 @@ df, df_master, df_tool, df_incoming = load_all_data()
 
 st.sidebar.title("🏭 사출 품질 MES")
 
-# 🔥 수입자재 대기건수 알람 계산
+# 🔥 수입자재 대기건수 계산 및 알람 로직
 pending_count = 0
-if "검사대상" in df_incoming.columns and "진행상태" in df_incoming.columns and not df_incoming.empty:
-    pending_items = df_incoming[(df_incoming['검사대상'].str.strip() == '대상') & (df_incoming['진행상태'].str.strip() == '대기')]
+if not df_incoming.empty and "진행상태" in df_incoming.columns:
+    pending_items = df_incoming[df_incoming['진행상태'].str.strip() == '대기']
     pending_count = len(pending_items)
 
 if pending_count > 0:
@@ -132,7 +141,7 @@ if st.sidebar.button("🔄 데이터 강제 새로고침"):
     st.cache_data.clear()
     st.rerun()
 
-# --- 🏠 홈 대시보드 ---
+# --- [1] 🏠 홈 대시보드 ---
 if menu == "🏠 홈 대시보드":
     st.title("📊 실시간 품질 현황")
     if not df.empty:
@@ -146,7 +155,7 @@ if menu == "🏠 홈 대시보드":
     else:
         st.warning("데이터가 없습니다.")
 
-# --- 📋 검사 현황(성적서) ---
+# --- [2] 📋 검사 현황(성적서) ---
 elif menu == "📋 검사 현황(성적서)":
     st.title("📋 기간별 데이터 조회 및 성적서")
     if not df.empty:
@@ -179,7 +188,7 @@ elif menu == "📋 검사 현황(성적서)":
             href = f'<a href="data:application/pdf;base64,{b64}" download="{label}_성적서.pdf"><button style="width:100%; padding:15px; background-color:#1A5276; color:white; border:none; border-radius:10px; cursor:pointer;">💾 PDF 리포트 저장</button></a>'
             st.markdown(href, unsafe_allow_html=True)
 
-# --- 📈 SPC 관리도 ---
+# --- [3] 📈 SPC 관리도 ---
 elif menu == "📈 SPC 관리도":
     st.title("📈 SPC 공정 분석")
     if not df.empty:
@@ -200,7 +209,7 @@ elif menu == "📈 SPC 관리도":
                 else: st.line_chart(spc_df[selected_measure])
             else: st.line_chart(spc_df[selected_measure])
 
-# --- 📏 계측기 검교정 관리 ---
+# --- [4] 📏 계측기 검교정 관리 ---
 elif menu == "📏 계측기 검교정 관리":
     st.title("📏 계측기 검교정 계획 및 실적")
     if not df_tool.empty:
@@ -234,35 +243,70 @@ elif menu == "📏 계측기 검교정 관리":
     else:
         st.warning("계측기 관리 데이터를 불러오지 못했습니다. '계측기관리' 시트와 열 이름을 확인해 주세요.")
 
-# --- 📥 수입자재 검사대기 (오류 완벽 해결) ---
+# --- [5] 📥 수입자재 검사대기 (품질팀 직접 입력기능 추가) ---
 elif menu == "📥 수입자재 검사대기":
-    st.title("📥 수입자재 수입검사 현황")
-    st.info("💡 구매부서에서 입고 처리한 자재 중 품질검사가 필요한 물량입니다.")
+    st.title("📥 수입자재 입고 등록 및 검사 현황")
+    
+    # 🌟 신규 자재 입고 등록 폼 (웹에서 직접 입력)
+    with st.expander("➕ 현장 자재 입고 등록 (품질팀용)", expanded=False):
+        with st.form("incoming_form", clear_on_submit=True):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                new_date = st.date_input("입고일자", datetime.now())
+                new_vendor = st.text_input("업체명")
+            with col2:
+                new_part_name = st.text_input("품명")
+                new_part_no = st.text_input("품번")
+            with col3:
+                new_qty = st.number_input("수량", min_value=0)
+                new_lot = st.text_input("LOT NO")
+            
+            submit_btn = st.form_submit_button("🚀 입고 등록 (대기열 추가)")
+            
+            if submit_btn:
+                if new_part_name and new_part_no:
+                    # 새로운 행 데이터 구성 (시트의 열 순서에 맞춤)
+                    new_row = [
+                        len(df_incoming) + 1 if not df_incoming.empty else 1, # NO
+                        new_date.strftime('%Y-%m-%d'), # 입고일자
+                        new_vendor,                  # 업체명
+                        new_part_name,               # 품명
+                        new_part_no,                 # 품번
+                        new_lot,                     # LOT NO
+                        new_qty,                     # 수량
+                        "대상",                       # 검사대상 (기본값)
+                        "대기"                        # 진행상태 (기본값)
+                    ]
+                    # 구글 시트에 직접 기록
+                    append_incoming_data(new_row)
+                    st.success(f"✅ {new_part_name} 입고 등록 완료! 화면을 새로고침합니다.")
+                    st.cache_data.clear() # 캐시 지우기
+                    st.rerun() # 화면 새로고침
+                else:
+                    st.warning("⚠️ 품명과 품번은 필수로 입력해주세요.")
 
-    # 🚀 시트가 연결되었고, 열 제목(Header)이 제대로 불러와졌는지 먼저 체크!
-    if "검사대상" in df_incoming.columns and "진행상태" in df_incoming.columns:
-        
+    st.markdown("---")
+
+    # 🌟 검사 대기열 리스트 출력
+    if not df_incoming.empty and "진행상태" in df_incoming.columns:
         view_mode = st.radio("조회 옵션", ["🚨 대기 중인 항목만 보기", "전체 입고 내역 보기"], horizontal=True)
         
-        # 데이터(행)가 0줄로 비어있는 경우 우아하게 안내 메시지 출력
-        if df_incoming.empty:
-            st.success("✨ 현재 구글 시트에 입력된 수입자재 내역이 없습니다.")
+        if view_mode == "🚨 대기 중인 항목만 보기":
+            view_df = df_incoming[df_incoming['진행상태'].str.strip() == '대기']
         else:
-            if view_mode == "🚨 대기 중인 항목만 보기":
-                view_df = df_incoming[(df_incoming['검사대상'].str.strip() == '대상') & (df_incoming['진행상태'].str.strip() == '대기')]
-            else:
-                view_df = df_incoming.copy()
+            view_df = df_incoming.copy()
 
-            st.subheader(f"📦 조회 리스트 (총 {len(view_df)}건)")
+        st.subheader(f"📦 조회 리스트 (총 {len(view_df)}건)")
 
-            def highlight_row(row):
-                if row.get('검사대상', '').strip() == '대상' and row.get('진행상태', '').strip() == '대기':
-                    return ['background-color: #ffcccc'] * len(row)
-                return [''] * len(row)
+        # 대기 상태인 항목 빨간색 하이라이트
+        def highlight_row(row):
+            if row.get('진행상태', '').strip() == '대기':
+                return ['background-color: #ffcccc'] * len(row)
+            return [''] * len(row)
 
-            st.dataframe(view_df.style.apply(highlight_row, axis=1), use_container_width=True)
+        st.dataframe(view_df.style.apply(highlight_row, axis=1), use_container_width=True)
 
-            if pending_count > 0:
-                st.warning("⚠️ 검사를 완료하신 후, 구글 시트에서 [진행상태]를 '완료'로 변경하시면 알람이 해제됩니다.")
+        if pending_count > 0:
+            st.warning("⚠️ 실제 검사를 완료하신 후, 구글 시트에서 [진행상태]를 '완료'로 변경하시면 알람이 해제됩니다.")
     else:
-        st.error("⚠️ 구글 시트를 찾을 수 없거나, 열 제목(NO, 입고일자, 검사대상 등)이 없습니다. 시트를 확인해주세요.")
+        st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
