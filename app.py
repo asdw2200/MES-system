@@ -252,15 +252,15 @@ elif menu == "📏 계측기 검교정 관리":
     else:
         st.warning("계측기 관리 데이터를 불러오지 못했습니다. '계측기관리' 시트와 열 이름을 확인해 주세요.")
 
-# --- [5] 📥 수입자재 검사대기 (부자재 기준정보 연동) ---
+# --- [5] 📥 수입자재 검사대기 (검사대상 여부 자동 연동형) ---
 elif menu == "📥 수입자재 검사대기":
     st.title("📥 수입자재 입고 등록 및 검사 현황")
     
     with st.expander("➕ 현장 자재 입고 등록 (품질팀용)", expanded=True):
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns([1.5, 1.5, 1, 1]) # 열을 4개로 쪼갭니다
         
-        # 🌟 1. "부자재기준정보" 시트에서 업체명 가져오기
-        if not df_sub_master.empty and "업체명" in df_sub_master.columns and "품번" in df_sub_master.columns and "품명" in df_sub_master.columns:
+        # 1. 부자재기준정보에서 업체명 가져오기
+        if not df_sub_master.empty and "업체명" in df_sub_master.columns and "품번" in df_sub_master.columns:
             vendor_list = ["선택하세요"] + sorted(list(df_sub_master["업체명"].dropna().unique()))
         else:
             vendor_list = ["부자재기준정보 시트 확인 요망"]
@@ -270,7 +270,7 @@ elif menu == "📥 수입자재 검사대기":
             selected_vendor = st.selectbox("🏢 업체명 선택", vendor_list)
 
         with col2:
-            # 🌟 2. 선택한 업체명에 맞는 부자재 품번 솎아내기
+            # 2. 업체명에 맞는 품번 솎아내기
             if selected_vendor not in ["선택하세요", "부자재기준정보 시트 확인 요망"]:
                 filtered_sub_master = df_sub_master[df_sub_master["업체명"] == selected_vendor]
                 part_no_list = ["선택하세요"] + sorted(list(filtered_sub_master["품번"].dropna().unique()))
@@ -279,24 +279,38 @@ elif menu == "📥 수입자재 검사대기":
 
             selected_part_no = st.selectbox("📦 품번 선택", part_no_list)
 
-            # 🌟 3. 품번 선택 시 품명 자동 가져오기
-            auto_part_name = ""
-            if selected_part_no not in ["선택하세요", "업체를 먼저 선택하세요"]:
-                matched_row = filtered_sub_master[filtered_sub_master["품번"] == selected_part_no].iloc[0]
-                auto_part_name = matched_row["품명"]
+        # 🌟 3. 품번 선택 시 품명 & "수입검사여부" 자동 가져오기
+        auto_part_name = ""
+        auto_inspect_flag = "대상" # 기본값
 
-            new_part_name = st.text_input("📝 품명 (자동입력)", value=auto_part_name, disabled=True)
+        if selected_part_no not in ["선택하세요", "업체를 먼저 선택하세요"]:
+            matched_row = filtered_sub_master[filtered_sub_master["품번"] == selected_part_no].iloc[0]
+            auto_part_name = matched_row["품명"]
+            
+            # 수입검사여부 열이 시트에 있는지 확인 후 가져오기
+            if "수입검사여부" in filtered_sub_master.columns:
+                val = matched_row["수입검사여부"]
+                if pd.notna(val) and str(val).strip() != "":
+                    auto_inspect_flag = str(val).strip()
 
         with col3:
+            new_part_name = st.text_input("📝 품명 (자동입력)", value=auto_part_name, disabled=True)
             new_qty = st.number_input("수량", min_value=0)
+            
+        with col4:
+            # 화면에 검사대상인지 아닌지 띄워줍니다.
+            st.text_input("🔍 검사여부 (자동판별)", value=auto_inspect_flag, disabled=True)
             new_lot = st.text_input("LOT NO")
         
-        submit_btn = st.button("🚀 입고 등록 (대기열 추가)", use_container_width=True)
+        submit_btn = st.button("🚀 입고 등록", use_container_width=True)
         
         if submit_btn:
             if selected_vendor in ["선택하세요", "부자재기준정보 시트 확인 요망"] or selected_part_no in ["선택하세요", "업체를 먼저 선택하세요"]:
                 st.warning("⚠️ 업체명과 품번을 정확히 선택해주세요.")
             else:
+                # 🌟 비대상일 경우 알람이 안 울리도록 상태를 '면제'로 자동 세팅!
+                current_status = "대기" if auto_inspect_flag == "대상" else "면제(완료)"
+                
                 new_row = [
                     len(df_incoming) + 1 if not df_incoming.empty else 1, 
                     new_date.strftime('%Y-%m-%d'), 
@@ -305,11 +319,16 @@ elif menu == "📥 수입자재 검사대기":
                     selected_part_no,            
                     new_lot,                     
                     new_qty,                     
-                    "대상",                       
-                    "대기"                        
+                    auto_inspect_flag, # 자동 판별된 검사여부 (대상/비대상)
+                    current_status     # 자동 판별된 상태 (대기/면제)
                 ]
                 append_incoming_data(new_row)
-                st.success(f"✅ [{selected_vendor}] {auto_part_name} 입고 등록 완료!")
+                
+                if auto_inspect_flag == "대상":
+                    st.error(f"🚨 [{selected_vendor}] {auto_part_name} - 수입검사 대기열에 추가되었습니다!")
+                else:
+                    st.success(f"✅ [{selected_vendor}] {auto_part_name} - 검사 비대상이므로 자동 완료 처리되었습니다!")
+                
                 st.cache_data.clear() 
                 st.rerun() 
 
@@ -331,9 +350,6 @@ elif menu == "📥 수입자재 검사대기":
             return [''] * len(row)
 
         st.dataframe(view_df.style.apply(highlight_row, axis=1), use_container_width=True)
-
-        if pending_count > 0:
-            st.warning("⚠️ 실제 검사를 완료하신 후, 구글 시트에서 [진행상태]를 '완료'로 변경하시면 알람이 해제됩니다.")
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
 
