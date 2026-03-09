@@ -38,7 +38,7 @@ def load_all_data():
     except:
         df_master = pd.DataFrame()
 
-    # [3] 🌟 부자재 기준정보
+    # [3] 부자재 기준정보
     try:
         sheet_sub_master = doc.worksheet("부자재기준정보")
         data_sub_master = sheet_sub_master.get_all_values()
@@ -78,8 +78,8 @@ def append_incoming_data(new_row):
     sheet_incoming = doc.worksheet("수입검사일지")
     sheet_incoming.append_row(new_row)
 
-# --- 🚀 3. 구글 시트 데이터 삭제 함수 (신규 추가!) ---
-def delete_incoming_data(sheet_row_index):
+# --- 🚀 3. 구글 시트 데이터 다중 삭제 함수 (업그레이드!) ---
+def delete_incoming_data_multiple(sheet_row_indices):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -87,7 +87,10 @@ def delete_incoming_data(sheet_row_index):
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XIF7Z1tlQQV7zFUql5gjv-veBgltjm0Hb2vflEo8" 
     doc = client.open_by_url(sheet_url)
     sheet_incoming = doc.worksheet("수입검사일지")
-    sheet_incoming.delete_rows(sheet_row_index)
+    
+    # 🚨 중요: 인덱스가 꼬이지 않도록 무조건 번호가 큰 것(밑에 있는 행)부터 역순으로 삭제합니다.
+    for row_index in sorted(sheet_row_indices, reverse=True):
+        sheet_incoming.delete_rows(row_index)
 
 # --- 📄 4. PDF 생성 함수 ---
 def create_report_pdf(dataframe, date_label, part_info):
@@ -144,7 +147,6 @@ df, df_master, df_sub_master, df_tool, df_incoming = load_all_data()
 
 st.sidebar.title("🏭 사출 품질 MES")
 
-# 🔥 수입자재 대기건수 계산 및 알람 로직
 pending_count = 0
 if not df_incoming.empty and "진행상태" in df_incoming.columns:
     pending_items = df_incoming[df_incoming['진행상태'].str.strip() == '대기']
@@ -262,11 +264,11 @@ elif menu == "📏 계측기 검교정 관리":
     else:
         st.warning("계측기 관리 데이터를 불러오지 못했습니다. '계측기관리' 시트와 열 이름을 확인해 주세요.")
 
-# --- [5] 📥 수입자재 검사대기 (검사대상 여부 + 삭제 기능 포함) ---
+# --- [5] 📥 수입자재 검사대기 (표 내부 체크박스 삭제 지원) ---
 elif menu == "📥 수입자재 검사대기":
     st.title("📥 수입자재 입고 등록 및 검사 현황")
     
-    with st.expander("➕ 현장 자재 입고 등록 (품질팀용)", expanded=True):
+    with st.expander("➕ 현장 자재 입고 등록 (품질팀용)", expanded=False):
         col1, col2, col3, col4 = st.columns([1.5, 1.5, 1, 1])
         
         if not df_sub_master.empty and "업체명" in df_sub_master.columns and "품번" in df_sub_master.columns:
@@ -338,50 +340,51 @@ elif menu == "📥 수입자재 검사대기":
 
     st.markdown("---")
 
-    # --- 조회 리스트 ---
+    # --- 🌟 조회 리스트 (체크박스 기능 적용) ---
     if not df_incoming.empty and "진행상태" in df_incoming.columns:
         view_mode = st.radio("조회 옵션", ["🚨 대기 중인 항목만 보기", "전체 입고 내역 보기"], horizontal=True)
         
         if view_mode == "🚨 대기 중인 항목만 보기":
-            view_df = df_incoming[df_incoming['진행상태'].str.strip() == '대기']
+            view_df = df_incoming[df_incoming['진행상태'].str.strip() == '대기'].copy()
         else:
             view_df = df_incoming.copy()
 
         st.subheader(f"📦 조회 리스트 (총 {len(view_df)}건)")
+
+        # 1. 맨 앞에 '선택' 열(체크박스용) 추가 (기본값 False)
+        view_df.insert(0, "선택", False)
 
         def highlight_row(row):
             if row.get('진행상태', '').strip() == '대기':
                 return ['background-color: #ffcccc'] * len(row)
             return [''] * len(row)
 
-        st.dataframe(view_df.style.apply(highlight_row, axis=1), use_container_width=True)
+        # 2. st.dataframe 대신 st.data_editor 사용 (표 안에서 클릭 가능하게 렌더링)
+        edited_df = st.data_editor(
+            view_df.style.apply(highlight_row, axis=1),
+            column_config={
+                "선택": st.column_config.CheckboxColumn("✅ 선택", default=False)
+            },
+            disabled=[col for col in view_df.columns if col != "선택"], # '선택' 열 빼고 나머지는 수정 불가
+            hide_index=True,
+            use_container_width=True
+        )
         
-        st.markdown("---")
-        
-        # 🌟 삭제 기능 추가 구간
-        with st.expander("🗑️ 잘못 입력한 데이터 삭제하기", expanded=False):
-            st.warning("⚠️ 선택하신 데이터를 구글 시트에서 완전히 삭제합니다. 신중하게 선택해 주세요.")
-            
-            # 삭제할 목록 만들기 (시트의 행 번호와 표시할 텍스트 묶기)
-            delete_options = []
-            for idx, row in df_incoming.iterrows():
-                # 데이터프레임 인덱스는 0부터 시작하고, 구글 시트는 1행이 제목이므로 실제 데이터는 2행부터 시작
-                sheet_row = idx + 2 
-                date_val = row.get('입고일자', '')
-                vendor_val = row.get('업체명', '')
-                name_val = row.get('품명', '')
-                status_val = row.get('진행상태', '')
+        # 3. 체크된 항목들만 모아내기
+        selected_rows = edited_df[edited_df["선택"] == True]
+
+        # 4. 하나라도 체크된 항목이 있으면 삭제 버튼 표시
+        if not selected_rows.empty:
+            st.error(f"⚠️ {len(selected_rows)}개의 데이터가 선택되었습니다.")
+            if st.button("🗑️ 선택한 데이터 영구 삭제", type="primary", use_container_width=True):
+                # 원래 데이터프레임의 인덱스를 구글 시트의 행 번호(1번은 제목줄이므로 +2)로 변환
+                indices_to_delete = selected_rows.index.tolist()
+                sheet_rows_to_delete = [idx + 2 for idx in indices_to_delete]
                 
-                display_text = f"[{date_val}] {vendor_val} - {name_val} (상태: {status_val})"
-                delete_options.append((sheet_row, display_text))
-            
-            # 드롭다운으로 삭제할 대상 선택
-            selected_to_delete = st.selectbox("❌ 삭제할 대상을 선택하세요", delete_options, format_func=lambda x: x[1])
-            
-            if st.button("🗑️ 선택한 데이터 영구 삭제"):
-                sheet_row_to_delete = selected_to_delete[0]
-                delete_incoming_data(sheet_row_to_delete)
-                st.success("✅ 깔끔하게 삭제되었습니다!")
+                # 삭제 함수 실행
+                delete_incoming_data_multiple(sheet_rows_to_delete)
+                
+                st.success("✅ 선택한 데이터가 구글 시트에서 완전히 삭제되었습니다!")
                 st.cache_data.clear()
                 st.rerun()
 
