@@ -177,6 +177,7 @@ if menu == "🏠 홈 대시보드":
         st.warning("데이터가 없습니다.")
 
 # --- [2] 📋 검사 현황(성적서) ---
+# --- [2] 📋 검사 현황(성적서) (상세보기 토글 적용) ---
 elif menu == "📋 검사 현황(성적서)":
     st.title("📋 기간별 데이터 조회 및 성적서")
     if not df.empty:
@@ -201,8 +202,23 @@ elif menu == "📋 검사 현황(성적서)":
 
         label = f"{start} ~ {end}"
         st.success(f"✅ {label} 조회 결과 ({len(final_df)}건)")
-        st.dataframe(final_df, use_container_width=True)
+
+        # 🌟 핵심 기능: 상세보기 토글 스위치 🌟
+        show_details = st.toggle("🔍 1~3번 개별 측정치 (상세 숫자) 펼쳐보기", value=False)
         
+        if show_details:
+            # 스위치를 켜면 모든 열(가로로 긴 전체 데이터)을 다 보여줌
+            display_df = final_df.copy()
+        else:
+            # 스위치를 끄면 '숫자 1, 2, 3'이 들어간 측정치 열은 숨기고 '판정' 결과만 깔끔하게 보여줌
+            # (단, '판정1', '판정2' 같은 열은 숨기면 안 되므로 제외)
+            cols_to_hide = [col for col in final_df.columns if any(str(i) in col for i in [1, 2, 3]) and "판정" not in col]
+            display_df = final_df.drop(columns=cols_to_hide)
+
+        # 화면에 표 출력 (숨겨진 컬럼이 적용된 상태로 나옵니다)
+        st.dataframe(display_df, use_container_width=True)
+        
+        # (아래 PDF 생성 부분은 기존 코드 그대로 유지)
         if st.button("📥 PDF 성적서 생성"):
             pdf_data = create_report_pdf(final_df, label, selected_part)
             b64 = base64.b64encode(pdf_data).decode()
@@ -390,6 +406,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
