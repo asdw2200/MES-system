@@ -176,8 +176,7 @@ if menu == "🏠 홈 대시보드":
     else:
         st.warning("데이터가 없습니다.")
 
-# --- [2] 📋 검사 현황(성적서) ---
-# --- [2] 📋 검사 현황(성적서) (상세보기 토글 적용) ---
+# --- [2] 📋 검사 현황(성적서) (체크박스 세로형 상세보기 적용) ---
 elif menu == "📋 검사 현황(성적서)":
     st.title("📋 기간별 데이터 조회 및 성적서")
     if not df.empty:
@@ -203,28 +202,55 @@ elif menu == "📋 검사 현황(성적서)":
         label = f"{start} ~ {end}"
         st.success(f"✅ {label} 조회 결과 ({len(final_df)}건)")
 
-        # 🌟 핵심 기능: 상세보기 토글 스위치 🌟
-        show_details = st.toggle("🔍 1~3번 개별 측정치 (상세 숫자) 펼쳐보기", value=False)
+        # 🌟 1. 기본 표에는 사진처럼 '차종 ~ 품번' 핵심 뼈대만 남기기
+        core_cols = ["차종", "검사일자", "검사자", "설비번호", "품명", "품번"]
+        available_cols = [c for c in core_cols if c in final_df.columns]
+        view_df = final_df[available_cols].copy()
         
-        if show_details:
-            # 스위치를 켜면 모든 열(가로로 긴 전체 데이터)을 다 보여줌
-            display_df = final_df.copy()
-        else:
-            # 스위치를 끄면 '숫자 1, 2, 3'이 들어간 측정치 열은 숨기고 '판정' 결과만 깔끔하게 보여줌
-            # (단, '판정1', '판정2' 같은 열은 숨기면 안 되므로 제외)
-            cols_to_hide = [col for col in final_df.columns if any(str(i) in col for i in [1, 2, 3]) and "판정" not in col]
-            display_df = final_df.drop(columns=cols_to_hide)
+        # 🌟 2. 맨 앞에 '상세보기' 체크박스 추가
+        view_df.insert(0, "상세보기", False)
 
-        # 화면에 표 출력 (숨겨진 컬럼이 적용된 상태로 나옵니다)
-        st.dataframe(display_df, use_container_width=True)
+        st.write("👉 **표 앞의 `[🔍 상세보기]` 체크박스를 켜면 아래쪽에 세부 측정 데이터가 펼쳐집니다.**")
         
-        # (아래 PDF 생성 부분은 기존 코드 그대로 유지)
+        edited_df = st.data_editor(
+            view_df,
+            column_config={
+                "상세보기": st.column_config.CheckboxColumn("🔍 상세보기", default=False)
+            },
+            disabled=available_cols, # 핵심 정보는 클릭해서 수정 못 하도록 잠금
+            hide_index=True,
+            use_container_width=True
+        )
+
+        # 🌟 3. 체크된 항목들의 세부 데이터를 세로형 표로 변환해서 출력
+        selected_indices = edited_df[edited_df["상세보기"] == True].index
+
+        if not selected_indices.empty:
+            st.markdown("---")
+            st.subheader("🔎 상세 검사 결과")
+            
+            for idx in selected_indices:
+                row_data = final_df.loc[idx]
+                
+                # 핵심 정보와 시스템용 타임스탬프는 세부 보기에서 제외
+                exclude_cols = available_cols + ["타임스탬프", "검사일자_dt", "ID", "id"]
+                detail_data = row_data.drop(labels=[c for c in exclude_cols if c in row_data.index])
+                
+                # 가로로 길었던 측정값을 '세로(위아래)'로 예쁘게 변환!
+                detail_table = pd.DataFrame(detail_data).reset_index()
+                detail_table.columns = ["검사 항목", "입력 / 측정값"]
+                
+                # 깔끔하게 폴더(아코디언) 형태로 열리게 만듦
+                with st.expander(f"📂 {row_data.get('검사일자', '')} | {row_data.get('품명', '')} ({row_data.get('품번', '')})", expanded=True):
+                    st.dataframe(detail_table, hide_index=True, use_container_width=True)
+
+        st.markdown("---")
+        
         if st.button("📥 PDF 성적서 생성"):
             pdf_data = create_report_pdf(final_df, label, selected_part)
             b64 = base64.b64encode(pdf_data).decode()
             href = f'<a href="data:application/pdf;base64,{b64}" download="{label}_성적서.pdf"><button style="width:100%; padding:15px; background-color:#1A5276; color:white; border:none; border-radius:10px; cursor:pointer;">💾 PDF 리포트 저장</button></a>'
             st.markdown(href, unsafe_allow_html=True)
-
 # --- [3] 📈 SPC 관리도 ---
 elif menu == "📈 SPC 관리도":
     st.title("📈 SPC 공정 분석")
@@ -406,6 +432,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
