@@ -38,7 +38,7 @@ def load_all_data():
     except:
         df_master = pd.DataFrame()
 
-    # [3] 🌟 부자재 기준정보 (신규 추가!)
+    # [3] 🌟 부자재 기준정보
     try:
         sheet_sub_master = doc.worksheet("부자재기준정보")
         data_sub_master = sheet_sub_master.get_all_values()
@@ -58,14 +58,13 @@ def load_all_data():
     try:
         sheet_incoming = doc.worksheet("수입검사일지") 
         data_incoming = sheet_incoming.get_all_values()
-        if len(data_incoming) > 0:
+        if len(data_incoming) > 1:
             df_incoming = pd.DataFrame(data_incoming[1:], columns=data_incoming[0])
         else:
             df_incoming = pd.DataFrame()
     except:
         df_incoming = pd.DataFrame()
 
-    # df_sub_master 가 추가로 반환됩니다.
     return df, df_master, df_sub_master, df_tool, df_incoming
 
 # --- 🚀 2. 구글 시트 데이터 쓰기 함수 ---
@@ -74,12 +73,23 @@ def append_incoming_data(new_row):
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XIF7Z1tlQQV7zFUql5gjv-veBgltjm0Hb2vflEo8" 
     doc = client.open_by_url(sheet_url)
     sheet_incoming = doc.worksheet("수입검사일지")
     sheet_incoming.append_row(new_row)
 
-# --- 📄 3. PDF 생성 함수 ---
+# --- 🚀 3. 구글 시트 데이터 삭제 함수 (신규 추가!) ---
+def delete_incoming_data(sheet_row_index):
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XIF7Z1tlQQV7zFUql5gjv-veBgltjm0Hb2vflEo8" 
+    doc = client.open_by_url(sheet_url)
+    sheet_incoming = doc.worksheet("수입검사일지")
+    sheet_incoming.delete_rows(sheet_row_index)
+
+# --- 📄 4. PDF 생성 함수 ---
 def create_report_pdf(dataframe, date_label, part_info):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
@@ -252,14 +262,13 @@ elif menu == "📏 계측기 검교정 관리":
     else:
         st.warning("계측기 관리 데이터를 불러오지 못했습니다. '계측기관리' 시트와 열 이름을 확인해 주세요.")
 
-# --- [5] 📥 수입자재 검사대기 (검사대상 여부 자동 연동형) ---
+# --- [5] 📥 수입자재 검사대기 (검사대상 여부 + 삭제 기능 포함) ---
 elif menu == "📥 수입자재 검사대기":
     st.title("📥 수입자재 입고 등록 및 검사 현황")
     
     with st.expander("➕ 현장 자재 입고 등록 (품질팀용)", expanded=True):
-        col1, col2, col3, col4 = st.columns([1.5, 1.5, 1, 1]) # 열을 4개로 쪼갭니다
+        col1, col2, col3, col4 = st.columns([1.5, 1.5, 1, 1])
         
-        # 1. 부자재기준정보에서 업체명 가져오기
         if not df_sub_master.empty and "업체명" in df_sub_master.columns and "품번" in df_sub_master.columns:
             vendor_list = ["선택하세요"] + sorted(list(df_sub_master["업체명"].dropna().unique()))
         else:
@@ -270,7 +279,6 @@ elif menu == "📥 수입자재 검사대기":
             selected_vendor = st.selectbox("🏢 업체명 선택", vendor_list)
 
         with col2:
-            # 2. 업체명에 맞는 품번 솎아내기
             if selected_vendor not in ["선택하세요", "부자재기준정보 시트 확인 요망"]:
                 filtered_sub_master = df_sub_master[df_sub_master["업체명"] == selected_vendor]
                 part_no_list = ["선택하세요"] + sorted(list(filtered_sub_master["품번"].dropna().unique()))
@@ -279,15 +287,13 @@ elif menu == "📥 수입자재 검사대기":
 
             selected_part_no = st.selectbox("📦 품번 선택", part_no_list)
 
-        # 🌟 3. 품번 선택 시 품명 & "수입검사여부" 자동 가져오기
         auto_part_name = ""
-        auto_inspect_flag = "대상" # 기본값
+        auto_inspect_flag = "대상" 
 
         if selected_part_no not in ["선택하세요", "업체를 먼저 선택하세요"]:
             matched_row = filtered_sub_master[filtered_sub_master["품번"] == selected_part_no].iloc[0]
             auto_part_name = matched_row["품명"]
             
-            # 수입검사여부 열이 시트에 있는지 확인 후 가져오기
             if "수입검사여부" in filtered_sub_master.columns:
                 val = matched_row["수입검사여부"]
                 if pd.notna(val) and str(val).strip() != "":
@@ -298,7 +304,6 @@ elif menu == "📥 수입자재 검사대기":
             new_qty = st.number_input("수량", min_value=0)
             
         with col4:
-            # 화면에 검사대상인지 아닌지 띄워줍니다.
             st.text_input("🔍 검사여부 (자동판별)", value=auto_inspect_flag, disabled=True)
             new_lot = st.text_input("LOT NO")
         
@@ -308,7 +313,6 @@ elif menu == "📥 수입자재 검사대기":
             if selected_vendor in ["선택하세요", "부자재기준정보 시트 확인 요망"] or selected_part_no in ["선택하세요", "업체를 먼저 선택하세요"]:
                 st.warning("⚠️ 업체명과 품번을 정확히 선택해주세요.")
             else:
-                # 🌟 비대상일 경우 알람이 안 울리도록 상태를 '면제'로 자동 세팅!
                 current_status = "대기" if auto_inspect_flag == "대상" else "면제(완료)"
                 
                 new_row = [
@@ -319,8 +323,8 @@ elif menu == "📥 수입자재 검사대기":
                     selected_part_no,            
                     new_lot,                     
                     new_qty,                     
-                    auto_inspect_flag, # 자동 판별된 검사여부 (대상/비대상)
-                    current_status     # 자동 판별된 상태 (대기/면제)
+                    auto_inspect_flag, 
+                    current_status     
                 ]
                 append_incoming_data(new_row)
                 
@@ -334,6 +338,7 @@ elif menu == "📥 수입자재 검사대기":
 
     st.markdown("---")
 
+    # --- 조회 리스트 ---
     if not df_incoming.empty and "진행상태" in df_incoming.columns:
         view_mode = st.radio("조회 옵션", ["🚨 대기 중인 항목만 보기", "전체 입고 내역 보기"], horizontal=True)
         
@@ -350,6 +355,36 @@ elif menu == "📥 수입자재 검사대기":
             return [''] * len(row)
 
         st.dataframe(view_df.style.apply(highlight_row, axis=1), use_container_width=True)
+        
+        st.markdown("---")
+        
+        # 🌟 삭제 기능 추가 구간
+        with st.expander("🗑️ 잘못 입력한 데이터 삭제하기", expanded=False):
+            st.warning("⚠️ 선택하신 데이터를 구글 시트에서 완전히 삭제합니다. 신중하게 선택해 주세요.")
+            
+            # 삭제할 목록 만들기 (시트의 행 번호와 표시할 텍스트 묶기)
+            delete_options = []
+            for idx, row in df_incoming.iterrows():
+                # 데이터프레임 인덱스는 0부터 시작하고, 구글 시트는 1행이 제목이므로 실제 데이터는 2행부터 시작
+                sheet_row = idx + 2 
+                date_val = row.get('입고일자', '')
+                vendor_val = row.get('업체명', '')
+                name_val = row.get('품명', '')
+                status_val = row.get('진행상태', '')
+                
+                display_text = f"[{date_val}] {vendor_val} - {name_val} (상태: {status_val})"
+                delete_options.append((sheet_row, display_text))
+            
+            # 드롭다운으로 삭제할 대상 선택
+            selected_to_delete = st.selectbox("❌ 삭제할 대상을 선택하세요", delete_options, format_func=lambda x: x[1])
+            
+            if st.button("🗑️ 선택한 데이터 영구 삭제"):
+                sheet_row_to_delete = selected_to_delete[0]
+                delete_incoming_data(sheet_row_to_delete)
+                st.success("✅ 깔끔하게 삭제되었습니다!")
+                st.cache_data.clear()
+                st.rerun()
+
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
 
