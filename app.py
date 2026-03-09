@@ -203,7 +203,7 @@ elif menu == "📋 검사 현황(성적서)":
         st.success(f"✅ {label} 조회 결과 ({len(final_df)}건)")
 
         # 🌟 1. 기본 표에는 사진처럼 '차종 ~ 품번' 핵심 뼈대만 남기기
-        core_cols = ["차종", "검사일자", "검사자", "설비번호", "품명", "품번"]
+        core_cols = ["차종", "검사일자", "검사자", "설비번호", "품명", "품번","승인자확인"]
         available_cols = [c for c in core_cols if c in final_df.columns]
         view_df = final_df[available_cols].copy()
         
@@ -432,6 +432,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
