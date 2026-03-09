@@ -276,7 +276,7 @@ elif menu == "📋 검사 현황(성적서)":
             
             for idx in selected_indices:
                 row_data = final_df.loc[idx]
-                exclude_cols = available_cols + ["타임스탬프", "검사일자_dt", "ID", "id"]
+                exclude_cols = available_cols + ["타임스탬프", "검사일자_dt", "ID", "id", "이메일 주소", "이메일"]
                 detail_data = row_data.drop(labels=[c for c in exclude_cols if c in row_data.index])
                 
                 detail_table = pd.DataFrame(detail_data).reset_index()
@@ -473,6 +473,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
