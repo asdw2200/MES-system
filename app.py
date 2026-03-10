@@ -268,8 +268,8 @@ elif menu == "📋 검사 현황(성적서)":
 
         if changes:
             st.warning(f"⚠️ {len(changes)}건의 결재 상태가 변경되었습니다. 반드시 아래 저장 버튼을 눌러 확정해 주세요!")
-            if st.button("💾 변경된 승인 결과 구글 시트에 최종 저장", type="primary", use_container_width=True):
-                with st.spinner("구글 시트에 결재 내역을 업데이트하는 중입니다..."):
+            if st.button("💾 저장", type="primary", use_container_width=True):
+                with st.spinner("변경 내용을 업데이트하는 중입니다..."):
                     for sheet_row, new_val in changes:
                         update_approval_status(sheet_row, new_val)
                 st.success("✅ 승인(결재) 처리가 완벽하게 저장되었습니다!")
@@ -530,6 +530,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
