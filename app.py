@@ -283,7 +283,7 @@ elif menu == "📋 검사 현황(성적서)":
             st.markdown("---")
             st.subheader("🔎 상세 검사 결과")
             
-           import re # 정규식(글자 쪼개기) 도구 
+            import re # 정규식(글자 쪼개기) 도구 
 
             for idx in selected_indices:
                 row_data = final_df.loc[idx]
@@ -555,6 +555,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
