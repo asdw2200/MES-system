@@ -476,8 +476,8 @@ elif menu == "📈 SPC 관리도":
         else:
             st.error(f"데이터에 {col1}, {col2}, {col3} 항목이 없어 평균을 낼 수 없습니다.")
 
-# --- [4] 📏 계측기 검교정 관리 ---
-elif menu == "📏 계측기 검교정 관리":
+# --- [4] 🛠️ 검교정 현황 ---
+elif menu == "🛠️ 검교정 현황":
     st.title("📏 계측기 검교정 계획 및 실적")
     if not df_tool.empty:
         target_col = "교정일자"
@@ -636,6 +636,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
