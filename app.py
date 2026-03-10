@@ -283,6 +283,8 @@ elif menu == "📋 검사 현황(성적서)":
             st.markdown("---")
             st.subheader("🔎 상세 검사 결과")
             
+           import re # 정규식(글자 쪼개기) 도구 
+
             for idx in selected_indices:
                 row_data = final_df.loc[idx]
                 
@@ -290,15 +292,34 @@ elif menu == "📋 검사 현황(성적서)":
                 exclude_cols = available_cols + ["타임스탬프", "검사일자_dt", "ID", "id", "이메일 주소", "이메일", "1열", "2열", "3열", "4열", "5열", "6열"]
                 detail_data = row_data.drop(labels=[c for c in exclude_cols if c in row_data.index])
                 
-                detail_table = pd.DataFrame(detail_data).reset_index()
-                detail_table.columns = ["검사 항목", "입력 / 측정값"]
+                # 🌟 마법의 코드: 세로로 긴 데이터를 가로(1, 2, 3번 시료)로 재배치!
+                parsed_data = {}
+                for col_name, val in detail_data.items():
+                    match = re.match(r'(.+?)([1-3])$', str(col_name)) # 이름 끝에 1,2,3이 있는지 확인
+                    if match:
+                        base_name = match.group(1).strip()     # '중량', '외관' 등
+                        sample_num = match.group(2) + "번 시료" # '1번 시료', '2번 시료' 등
+                        if base_name not in parsed_data:
+                            parsed_data[base_name] = {}
+                        parsed_data[base_name][sample_num] = val
+                    else:
+                        base_name = str(col_name) # 숫자가 안 붙은 일반 항목 (초기불량, 기능검사 등)
+                        if base_name not in parsed_data:
+                            parsed_data[base_name] = {}
+                        parsed_data[base_name]["공통 / 단일값"] = val
+                        
+                # 딕셔너리를 예쁜 표(데이터프레임)로 변환
+                detail_table = pd.DataFrame.from_dict(parsed_data, orient='index').reset_index()
+                detail_table.rename(columns={'index': '검사 항목'}, inplace=True)
                 
-                # 🌟 이름 예쁘게 바꾸기: 끝에 1,2,3이 붙은 글자를 '(n번 시료)' 형태로 변환
-                detail_table["검사 항목"] = detail_table["검사 항목"].str.replace(r'([가-힣]+)([1-3])$', r'\1 (\2번 시료)', regex=True)
+                # 표 열 순서를 보기 좋게 강제 정렬 (항목 -> 1번 -> 2번 -> 3번 -> 공통)
+                expected_cols = ['검사 항목', '1번 시료', '2번 시료', '3번 시료', '공통 / 단일값']
+                ordered_cols = [c for c in expected_cols if c in detail_table.columns]
+                # 빈칸은 하이픈(-)으로 깔끔하게 처리
+                detail_table = detail_table[ordered_cols].fillna("-") 
                 
                 with st.expander(f"📂 {row_data.get('검사일자', '')} | {row_data.get('품명', '')} ({row_data.get('품번', '')})", expanded=True):
                     st.dataframe(detail_table, hide_index=True, use_container_width=True)
-        st.markdown("---")
         
         if st.button("📥 PDF 성적서 생성"):
             pdf_data = create_report_pdf(final_df, label, selected_part)
@@ -534,6 +555,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
