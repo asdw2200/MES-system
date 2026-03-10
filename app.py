@@ -159,7 +159,11 @@ def create_report_pdf(dataframe, date_label, part_info):
     return pdf.output(dest="S").encode("latin-1", errors="replace")
 
 # --- 🛰️ 시스템 가동 ---
-df, df_master, df_sub_master, df_tool, df_incoming = load_all_data()
+try:
+    df, df_master, df_sub_master, df_tool, df_incoming = load_all_data()
+except Exception as e:
+    st.warning("⏳ 구글 서버 보호를 위해 잠시 접속이 대기 중입니다. (새로고침이 너무 빨랐습니다!) 약 1분 뒤에 F5를 눌러주세요.")
+    st.stop() # 여기서 멈춰서 무시무시한 빨간 에러창이 뜨는 것을 막아줍니다!
 
 st.sidebar.markdown("""
     <div style='text-align: center; margin-bottom: 20px;'>
@@ -528,6 +532,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
