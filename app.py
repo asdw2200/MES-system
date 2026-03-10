@@ -267,8 +267,6 @@ with st.sidebar:
 
 # --- 화면 출력부 시작 ---
 if menu == "📊 대시보드":
-# (이 아래로는 대시보드 코드가 쭉 이어집니다)
-if menu == "📊 대시보드":
     st.title("📊 실시간 품질 현황")
     if not df.empty:
         c1, c2, c3 = st.columns(3)
@@ -662,6 +660,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
