@@ -292,30 +292,38 @@ elif menu == "📋 검사 현황(성적서)":
                 exclude_cols = available_cols + ["타임스탬프", "검사일자_dt", "ID", "id", "이메일 주소", "이메일", "1열", "2열", "3열", "4열", "5열", "6열"]
                 detail_data = row_data.drop(labels=[c for c in exclude_cols if c in row_data.index])
                 
-                # 🌟 마법의 코드: 세로로 긴 데이터를 가로(1, 2, 3번 시료)로 재배치!
+                # 🌟 마법의 코드 2탄: 구글 시트의 원래 순서를 절대 잊지 않도록 리스트에 기록!
+                ordered_base_names = [] 
                 parsed_data = {}
+                
                 for col_name, val in detail_data.items():
                     match = re.match(r'(.+?)([1-3])$', str(col_name)) # 이름 끝에 1,2,3이 있는지 확인
                     if match:
                         base_name = match.group(1).strip()     # '중량', '외관' 등
-                        sample_num = match.group(2) + "번 시료" # '1번 시료', '2번 시료' 등
-                        if base_name not in parsed_data:
-                            parsed_data[base_name] = {}
-                        parsed_data[base_name][sample_num] = val
+                        sample_num = match.group(2) + "번 시료" # '1번 시료' 등
                     else:
-                        base_name = str(col_name) # 숫자가 안 붙은 일반 항목 (초기불량, 기능검사 등)
-                        if base_name not in parsed_data:
-                            parsed_data[base_name] = {}
-                        parsed_data[base_name]["공통 / 단일값"] = val
+                        base_name = str(col_name).strip() # 1~3이 안 붙은 항목 (초기불량, 치수4, 판정4 등)
+                        sample_num = "공통 / 단일값"
                         
-                # 딕셔너리를 예쁜 표(데이터프레임)로 변환
-                detail_table = pd.DataFrame.from_dict(parsed_data, orient='index').reset_index()
-                detail_table.rename(columns={'index': '검사 항목'}, inplace=True)
+                    # 처음 발견한 항목이면 순서 명단(ordered_base_names)에 1빠로 추가!
+                    if base_name not in parsed_data:
+                        parsed_data[base_name] = {}
+                        ordered_base_names.append(base_name)
+                        
+                    parsed_data[base_name][sample_num] = val
+                        
+                # 🌟 기록해둔 순서 명단대로 차곡차곡 표 조립하기
+                rows = []
+                for base in ordered_base_names:
+                    row_dict = {"검사 항목": base}
+                    row_dict.update(parsed_data[base])
+                    rows.append(row_dict)
+                    
+                detail_table = pd.DataFrame(rows)
                 
                 # 표 열 순서를 보기 좋게 강제 정렬 (항목 -> 1번 -> 2번 -> 3번 -> 공통)
-                expected_cols = ['검사 항목', '공통 / 단일값', '1번 시료', '2번 시료', '3번 시료']
+                expected_cols = ['검사 항목', '1번 시료', '2번 시료', '3번 시료', '공통 / 단일값']
                 ordered_cols = [c for c in expected_cols if c in detail_table.columns]
-                # 빈칸은 하이픈(-)으로 깔끔하게 처리
                 detail_table = detail_table[ordered_cols].fillna("-") 
                 
                 with st.expander(f"📂 {row_data.get('검사일자', '')} | {row_data.get('품명', '')} ({row_data.get('품번', '')})", expanded=True):
@@ -555,6 +563,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
