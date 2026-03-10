@@ -292,27 +292,36 @@ elif menu == "📋 검사 현황(성적서)":
                 exclude_cols = available_cols + ["타임스탬프", "검사일자_dt", "ID", "id", "이메일 주소", "이메일", "1열", "2열", "3열", "4열", "5열", "6열"]
                 detail_data = row_data.drop(labels=[c for c in exclude_cols if c in row_data.index])
                 
-                # 🌟 마법의 코드 2탄: 구글 시트의 원래 순서를 절대 잊지 않도록 리스트에 기록!
                 ordered_base_names = [] 
                 parsed_data = {}
                 
                 for col_name, val in detail_data.items():
-                    match = re.match(r'(.+?)([1-3])$', str(col_name)) # 이름 끝에 1,2,3이 있는지 확인
-                    if match:
-                        base_name = match.group(1).strip()     # '중량', '외관' 등
-                        sample_num = match.group(2) + "번 시료" # '1번 시료' 등
+                    col_str = str(col_name).strip()
+                    
+                    # 🌟 핵심 수정: '판정'이나 '치수'로 시작하는 열은 1,2,3번 시료로 묶지 않고 각각 단독 줄로 뺌!
+                    if col_str.startswith("판정") or col_str.startswith("치수"):
+                        if col_str not in parsed_data:
+                            parsed_data[col_str] = {}
+                            ordered_base_names.append(col_str) # 구글 시트 원래 순서 기록
+                        parsed_data[col_str]["공통 / 단일값"] = val
+                    
+                    # 그 외 항목(중량, 두께, 외관 등)은 끝에 1~3이 있으면 시료로 예쁘게 묶어줌
                     else:
-                        base_name = str(col_name).strip() # 1~3이 안 붙은 항목 (초기불량, 치수4, 판정4 등)
-                        sample_num = "공통 / 단일값"
+                        match = re.match(r'(.+?)([1-3])$', col_str) 
+                        if match:
+                            base_name = match.group(1).strip()     
+                            sample_num = match.group(2) + "번 시료" 
+                        else:
+                            base_name = col_str 
+                            sample_num = "공통 / 단일값"
+                            
+                        if base_name not in parsed_data:
+                            parsed_data[base_name] = {}
+                            ordered_base_names.append(base_name)
+                            
+                        parsed_data[base_name][sample_num] = val
                         
-                    # 처음 발견한 항목이면 순서 명단(ordered_base_names)에 1빠로 추가!
-                    if base_name not in parsed_data:
-                        parsed_data[base_name] = {}
-                        ordered_base_names.append(base_name)
-                        
-                    parsed_data[base_name][sample_num] = val
-                        
-                # 🌟 기록해둔 순서 명단대로 차곡차곡 표 조립하기
+                # 🌟 기록해둔 순서대로 표 조립하기
                 rows = []
                 for base in ordered_base_names:
                     row_dict = {"검사 항목": base}
@@ -321,7 +330,7 @@ elif menu == "📋 검사 현황(성적서)":
                     
                 detail_table = pd.DataFrame(rows)
                 
-                # 표 열 순서를 보기 좋게 강제 정렬 (항목 -> 공통 -> 1번 -> 2번 -> 3번)
+                # 공통값이 앞으로 오도록 열 순서 정렬
                 expected_cols = ['검사 항목', '공통 / 단일값', '1번 시료', '2번 시료', '3번 시료']
                 ordered_cols = [c for c in expected_cols if c in detail_table.columns]
                 detail_table = detail_table[ordered_cols].fillna("-") 
@@ -563,6 +572,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
