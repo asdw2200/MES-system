@@ -1,14 +1,5 @@
 import streamlit as st
 import pandas as pd
-# 등등 다른 import들...
-
-# 🌟 무조건 다른 st. 코드들보다 가장 위에 있어야 합니다!
-st.set_page_config(
-    page_title="사출 품질 MES",  
-    page_icon="🏭",           
-    layout="wide"             
-)
-
 # --- 🔐 로그인 자물쇠 기능 ---
 # (이 아래로 로그인 코드 시작)
 import pandas as pd
@@ -20,6 +11,13 @@ import base64
 import os
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
+
+# 🌟 무조건 다른 st. 코드들보다 가장 위에 있어야 합니다!
+st.set_page_config(
+    page_title="사출 품질 MES",  
+    page_icon="🏭",           
+    layout="wide"             
+)
 
 # --- 🔐 로그인 자물쇠 기능 ---
 def check_password():
@@ -632,6 +630,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
