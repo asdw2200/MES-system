@@ -7,6 +7,7 @@ from fpdf import FPDF
 import base64
 import os
 from datetime import datetime, timedelta
+import plotly.graph_objects as go
 
 # 1. 페이지 설정
 st.set_page_config(page_title="사출 품질 MES 시스템", page_icon="🏭", layout="wide")
@@ -298,26 +299,74 @@ elif menu == "📋 검사 현황(성적서)":
             b64 = base64.b64encode(pdf_data).decode()
             href = f'<a href="data:application/pdf;base64,{b64}" download="{label}_성적서.pdf"><button style="width:100%; padding:15px; background-color:#1A5276; color:white; border:none; border-radius:10px; cursor:pointer;">💾 PDF 리포트 저장</button></a>'
             st.markdown(href, unsafe_allow_html=True)
-# --- [3] 📈 SPC 관리도 ---
+# --- [3] 📈 SPC 관리도 (평균값 적용 및 고급 차트 업그레이드) ---
 elif menu == "📈 SPC 관리도":
-    st.title("📈 SPC 공정 분석")
+    st.title("📈 SPC 관리도 (X-bar 평균 차트)")
+    st.markdown("측정된 3개의 샘플(초물/중물/종물)의 **평균값**을 계산하여 추이를 보여줍니다.")
+    
     if not df.empty:
-        selected_part = st.selectbox("품번 선택", list(df["품번"].unique()))
-        spc_df = df[df["품번"] == selected_part].copy()
-        measures = [c for c in df.columns if c not in ["검사일자", "차종", "품명", "품번", "설비번호", "검사자", "타임스탬프", "판정1", "초물/중물", "검사일자_dt"] and "외관" not in c]
-        if measures:
-            selected_measure = st.selectbox("측정 항목", measures)
-            spc_df[selected_measure] = pd.to_numeric(spc_df[selected_measure], errors='coerce')
-            spc_df = spc_df.dropna(subset=[selected_measure])
-            master = df_master[df_master["품번"] == selected_part]
-            if not master.empty:
-                u_col, l_col = f"{selected_measure}MAX", f"{selected_measure}MIN"
-                if u_col in master.columns and l_col in master.columns:
-                    ucl, lcl = pd.to_numeric(master[u_col], errors='coerce').values[0], pd.to_numeric(master[l_col], errors='coerce').values[0]
-                    chart_data = pd.DataFrame({"측정치": spc_df[selected_measure].values, "상한(UCL)": ucl, "하한(LCL)": lcl}, index=spc_df["검사일자"].tolist())
-                    st.line_chart(chart_data)
-                else: st.line_chart(spc_df[selected_measure])
-            else: st.line_chart(spc_df[selected_measure])
+        c1, c2, c3 = st.columns(3)
+        with c1: 
+            all_parts = sorted(list(df["품번"].unique()))
+            selected_part = st.selectbox("📦 품번 선택", all_parts)
+        with c2: 
+            inspect_item = st.selectbox("🔍 검사 항목", ["중량", "두께", "내경", "외경", "전장"])
+        with c3:
+            data_count = st.number_input("📊 최근 조회 데이터 건수", min_value=5, max_value=100, value=30)
+            
+        # 선택한 품번 데이터 필터링 (최근 데이터 순)
+        df_spc = df[df["품번"] == selected_part].copy()
+        df_spc = df_spc.sort_values(by="검사일자_dt").tail(data_count)
+        
+        # 🌟 핵심 기능: 1, 2, 3번 측정값의 '평균' 구하기
+        col1, col2, col3 = f"{inspect_item}1", f"{inspect_item}2", f"{inspect_item}3"
+        
+        if col1 in df_spc.columns and col2 in df_spc.columns and col3 in df_spc.columns:
+            # 안전하게 숫자로 변환 후 빈칸은 제외하고 평균 계산
+            for c in [col1, col2, col3]:
+                df_spc[c] = pd.to_numeric(df_spc[c], errors='coerce')
+            
+            # 3개 측정치의 평균을 구해 새로운 '평균값' 기둥을 만듦
+            df_spc['평균값'] = df_spc[[col1, col2, col3]].mean(axis=1, skipna=True)
+            df_spc = df_spc.dropna(subset=['평균값']) # 평균이 안 구해진 텅 빈 데이터는 제외
+            
+            if not df_spc.empty:
+                # 🌟 고급 Plotly 차트 그리기
+                fig = go.Figure()
+                
+                # 평균값 꺾은선 추가
+                fig.add_trace(go.Scatter(
+                    x=df_spc['검사일자'], 
+                    y=df_spc['평균값'],
+                    mode='lines+markers+text',
+                    name=f'{inspect_item} 평균',
+                    line=dict(color='#1A5276', width=3), # 딥블루 선
+                    marker=dict(size=10, color='#E74C3C', symbol='circle'), # 빨간색 타점
+                    text=df_spc['평균값'].round(2), # 타점 위에 소수점 2자리 평균값 표시
+                    textposition="top center",
+                    textfont=dict(size=12, color='black')
+                ))
+                
+                # 차트 디자인 세팅
+                fig.update_layout(
+                    title=dict(text=f"<b>[{selected_part}] {inspect_item} 평균값 추이</b>", font=dict(size=20)),
+                    xaxis_title="검사 일시",
+                    yaxis_title=f"{inspect_item} 평균 측정값",
+                    template="plotly_white",
+                    hovermode="x unified", # 마우스를 올리면 예쁜 정보창이 뜸!
+                    margin=dict(l=40, r=40, t=60, b=40)
+                )
+                
+                # 화면에 예쁘게 꽉 채워서 출력
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # 계산된 상세 내역을 폴더로 숨겨둠 (필요할 때 열어볼 수 있게)
+                with st.expander("📊 평균값 계산 상세 내역 보기 (클릭하여 펼치기)"):
+                    st.dataframe(df_spc[['검사일자', '검사자', '설비번호', col1, col2, col3, '평균값']], hide_index=True)
+            else:
+                st.warning("측정된 숫자 데이터가 없습니다. (입력 시 숫자로 넣었는지 확인해주세요)")
+        else:
+            st.error(f"데이터에 {col1}, {col2}, {col3} 항목이 없어 평균을 낼 수 없습니다.")
 
 # --- [4] 📏 계측기 검교정 관리 ---
 elif menu == "📏 계측기 검교정 관리":
@@ -479,6 +528,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
