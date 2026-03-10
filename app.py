@@ -8,6 +8,7 @@ import base64
 import os
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
+from streamlit_option_menu import option_menu
 
 # 🌟 준비물(import)을 다 챙긴 후, 가장 먼저 웹사이트 이름과 껍데기를 세팅합니다!
 st.set_page_config(
@@ -233,19 +234,31 @@ if st.sidebar.button("🔄 데이터 강제 새로고침"):
     st.cache_data.clear()
     st.rerun()
 
-# --- [1] 🏠 홈 대시보드 ---
-if menu == "🏠 홈 대시보드":
-    st.title("📊 실시간 품질 현황")
-    if not df.empty:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("총 검사 건수", f"{len(df)}건")
-        c2.metric("초물 완료", f"{len(df[df['초물/중물'] == '초물'])}건")
-        c3.metric("중물 완료", f"{len(df[df['초물/중물'] == '중물'])}건")
-        st.markdown("---")
-        st.subheader("📦 품목별 검사 비중")
-        st.bar_chart(df["품번"].value_counts())
-    else:
-        st.warning("데이터가 없습니다.")
+# --- 📌 사이드바 메뉴 (화려한 블록 디자인 적용) ---
+with st.sidebar:
+    st.markdown("<h3 style='text-align: center;'>🏭 사출 품질 MES</h3>", unsafe_allow_html=True)
+    
+    menu = option_menu(
+        menu_title=None, # 메뉴 제목은 깔끔하게 숨김
+        options=["📊 대시보드", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고"],
+        default_index=0,
+        styles={
+            "container": {"padding": "5!important", "background-color": "transparent"},
+            "nav-link": {
+                "font-size": "16px", 
+                "text-align": "left", 
+                "margin": "0px", 
+                "padding": "15px", # 버튼 위아래 여백을 줘서 큼직하게 만듦
+                "--hover-color": "#E5E8E8" # 마우스 올렸을 때 연한 회색
+            },
+            "nav-link-selected": {
+                "background-color": "#1A5276", # 선택된 메뉴는 딥블루 색상
+                "color": "white", 
+                "font-weight": "bold"
+            },
+        }
+    )
+    st.markdown("---")
 
 # --- [2] 📋 검사 현황(성적서) (결재 O/X 기능 - 이름표 수정 완료) ---
 elif menu == "📋 검사 현황(성적서)":
@@ -627,6 +640,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
