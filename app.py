@@ -211,37 +211,12 @@ except Exception as e:
     st.warning("⏳ 구글 서버 보호를 위해 잠시 접속이 대기 중입니다. (새로고침이 너무 빨랐습니다!) 약 1분 뒤에 F5를 눌러주세요.")
     st.stop() # 여기서 멈춰서 무시무시한 빨간 에러창이 뜨는 것을 막아줍니다!
 
-st.sidebar.markdown("""
-    <div style='text-align: center; margin-bottom: 20px;'>
-        <h2 style='color: #1A5276; font-weight: bold;'>🏭 사출 품질 MES</h2>
-        <span style='color: #7F8C8D; font-size: 14px;'>Quality Management System</span>
-        <hr style='margin-top: 10px; margin-bottom: 10px;'>
-    </div>
-""", unsafe_allow_html=True)
-
-pending_count = 0
-if not df_incoming.empty and "진행상태" in df_incoming.columns:
-    pending_items = df_incoming[df_incoming['진행상태'].str.strip() == '대기']
-    pending_count = len(pending_items)
-
-if pending_count > 0:
-    st.sidebar.error(f"🚨 긴급 알람!\n수입검사 대기 물량: {pending_count}건")
-    st.sidebar.info("👇 '수입자재 검사대기' 메뉴 확인 요망")
-
-menu = st.sidebar.radio("메뉴 이동", ["🏠 홈 대시보드", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📏 계측기 검교정 관리", "📥 수입자재 검사대기"])
-
-if st.sidebar.button("🔄 데이터 강제 새로고침"):
-    st.cache_data.clear()
-    st.rerun()
-
-# --- 📌 사이드바 메뉴 (화려한 블록 디자인 적용 완료) ---
+# --- 📌 사이드바 메뉴 (중복 제거 완료!) ---
 with st.sidebar:
-    # 1. 로고 및 타이틀
     st.markdown("<h2 style='text-align: center; color: #1A5276;'>🏭 사출 품질 MES</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: gray; font-size: 12px;'>Quality Management System</p>", unsafe_allow_html=True)
     st.markdown("---")
     
-    # 2. 고급 블록 메뉴
     menu = option_menu(
         menu_title=None, 
         options=["📊 대시보드", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고"],
@@ -260,11 +235,12 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # 3. 데이터 새로고침 버튼 (필수 기능 유지!)
     if st.button("🔄 데이터 강제 새로고침", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
+# --- 화면 출력부 시작 ---
+# (이 바로 아래에 원래 있던 if menu == "📊 대시보드": 가 오면 완벽합니다!)
 # --- 화면 출력부 시작 ---
 if menu == "📊 대시보드":
     st.title("📊 실시간 품질 현황")
@@ -660,6 +636,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
