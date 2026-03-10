@@ -313,7 +313,7 @@ elif menu == "📋 검사 현황(성적서)":
                 detail_table.rename(columns={'index': '검사 항목'}, inplace=True)
                 
                 # 표 열 순서를 보기 좋게 강제 정렬 (항목 -> 1번 -> 2번 -> 3번 -> 공통)
-                expected_cols = ['검사 항목', '1번 시료', '2번 시료', '3번 시료', '공통 / 단일값']
+                expected_cols = ['검사 항목', '공통 / 단일값', '1번 시료', '2번 시료', '3번 시료']
                 ordered_cols = [c for c in expected_cols if c in detail_table.columns]
                 # 빈칸은 하이픈(-)으로 깔끔하게 처리
                 detail_table = detail_table[ordered_cols].fillna("-") 
@@ -555,6 +555,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
