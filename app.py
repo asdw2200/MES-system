@@ -288,8 +288,14 @@ elif menu == "📋 검사 현황(성적서)":
                 exclude_cols = available_cols + ["타임스탬프", "검사일자_dt", "ID", "id", "이메일 주소", "이메일"]
                 detail_data = row_data.drop(labels=[c for c in exclude_cols if c in row_data.index])
                 
-                detail_table = pd.DataFrame(detail_data).reset_index()
+               detail_table = pd.DataFrame(detail_data).reset_index()
                 detail_table.columns = ["검사 항목", "입력 / 측정값"]
+                
+                # 🌟 추가된 코드: 끝에 1,2,3이 붙은 글자를 '(n번 시료)' 형태로 예쁘게 바꿔줍니다!
+                detail_table["검사 항목"] = detail_table["검사 항목"].str.replace(r'([가-힣]+)([1-3])$', r'\1 (\2번 시료)', regex=True)
+                
+                with st.expander(f"📂 {row_data.get('검사일자', '')} | ...
+                
                 
                 with st.expander(f"📂 {row_data.get('검사일자', '')} | {row_data.get('품명', '')} ({row_data.get('품번', '')})", expanded=True):
                     st.dataframe(detail_table, hide_index=True, use_container_width=True)
@@ -530,6 +536,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
