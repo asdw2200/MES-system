@@ -239,26 +239,38 @@ with st.sidebar:
     st.markdown("<h3 style='text-align: center;'>🏭 사출 품질 MES</h3>", unsafe_allow_html=True)
     
     menu = option_menu(
-        menu_title=None, # 메뉴 제목은 깔끔하게 숨김
+        menu_title=None, 
         options=["📊 대시보드", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고"],
         default_index=0,
         styles={
             "container": {"padding": "5!important", "background-color": "transparent"},
             "nav-link": {
-                "font-size": "16px", 
-                "text-align": "left", 
-                "margin": "0px", 
-                "padding": "15px", # 버튼 위아래 여백을 줘서 큼직하게 만듦
-                "--hover-color": "#E5E8E8" # 마우스 올렸을 때 연한 회색
+                "font-size": "16px", "text-align": "left", "margin": "0px", "padding": "15px", 
+                "--hover-color": "#E5E8E8"
             },
             "nav-link-selected": {
-                "background-color": "#1A5276", # 선택된 메뉴는 딥블루 색상
-                "color": "white", 
-                "font-weight": "bold"
+                "background-color": "#1A5276", "color": "white", "font-weight": "bold"
             },
         }
     )
     st.markdown("---")
+
+# 🚨 여기가 복사 중 실수로 지워졌던 부분입니다! (대시보드 복구 완료) 🚨
+if menu == "📊 대시보드":
+    st.title("📊 실시간 품질 현황")
+    if not df.empty:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("총 검사 건수", f"{len(df)}건")
+        c2.metric("초물 완료", f"{len(df[df.apply(lambda r: r.astype(str).str.contains('초물').any(), axis=1)])}건")
+        c3.metric("종물 완료", f"{len(df[df.apply(lambda r: r.astype(str).str.contains('종물').any(), axis=1)])}건")
+        st.markdown("---")
+        st.subheader("📦 품목별 검사 비중")
+        st.bar_chart(df['품번'].value_counts())
+    else:
+        st.info("아직 입력된 데이터가 없습니다.")
+
+# (이 아래는 원래 있던 성적서 화면 코드가 그대로 이어집니다)
+elif menu == "📋 검사 현황(성적서)":
 
 # --- [2] 📋 검사 현황(성적서) (결재 O/X 기능 - 이름표 수정 완료) ---
 elif menu == "📋 검사 현황(성적서)":
@@ -640,6 +652,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
