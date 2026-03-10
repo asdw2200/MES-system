@@ -298,14 +298,24 @@ elif menu == "📋 검사 현황(성적서)":
                 for col_name, val in detail_data.items():
                     col_str = str(col_name).strip()
                     
-                    # 🌟 핵심 수정: '판정'이나 '치수'로 시작하는 열은 1,2,3번 시료로 묶지 않고 각각 단독 줄로 뺌!
-                    if col_str.startswith("판정") or col_str.startswith("치수"):
+                    # 🌟 마법의 복사기: '판정' 열은 값이 하나뿐이어도 1,2,3번 시료 칸에 모두 도장을 찍어줌!
+                    if col_str.startswith("판정"):
                         if col_str not in parsed_data:
                             parsed_data[col_str] = {}
-                            ordered_base_names.append(col_str) # 구글 시트 원래 순서 기록
+                            ordered_base_names.append(col_str)
+                        parsed_data[col_str]["1번 시료"] = val
+                        parsed_data[col_str]["2번 시료"] = val
+                        parsed_data[col_str]["3번 시료"] = val
+                        parsed_data[col_str]["공통 / 단일값"] = "-" # 판정의 공통 칸은 비워둠
+                        
+                    # '치수'는 공통 칸에 그대로 둠
+                    elif col_str.startswith("치수"):
+                        if col_str not in parsed_data:
+                            parsed_data[col_str] = {}
+                            ordered_base_names.append(col_str)
                         parsed_data[col_str]["공통 / 단일값"] = val
                     
-                    # 그 외 항목(중량, 두께, 외관 등)은 끝에 1~3이 있으면 시료로 예쁘게 묶어줌
+                    # 그 외 항목(중량, 두께, 외관 등)은 끝에 1~3이 있으면 시료 칸으로 보냄
                     else:
                         match = re.match(r'(.+?)([1-3])$', col_str) 
                         if match:
@@ -330,7 +340,7 @@ elif menu == "📋 검사 현황(성적서)":
                     
                 detail_table = pd.DataFrame(rows)
                 
-                # 공통값이 앞으로 오도록 열 순서 정렬
+                # 열 순서 정렬
                 expected_cols = ['검사 항목', '공통 / 단일값', '1번 시료', '2번 시료', '3번 시료']
                 ordered_cols = [c for c in expected_cols if c in detail_table.columns]
                 detail_table = detail_table[ordered_cols].fillna("-") 
@@ -572,6 +582,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
