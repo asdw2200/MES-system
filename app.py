@@ -1,8 +1,5 @@
 import streamlit as st
 import pandas as pd
-# --- 🔐 로그인 자물쇠 기능 ---
-# (이 아래로 로그인 코드 시작)
-import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import numpy as np
@@ -12,11 +9,11 @@ import os
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 
-# 🌟 무조건 다른 st. 코드들보다 가장 위에 있어야 합니다!
+# 🌟 준비물(import)을 다 챙긴 후, 가장 먼저 웹사이트 이름과 껍데기를 세팅합니다!
 st.set_page_config(
-    page_title="사출 품질 MES",  
-    page_icon="🏭",           
-    layout="wide"             
+    page_title="사출 품질 MES",
+    page_icon="🏭",
+    layout="wide"
 )
 
 # --- 🔐 로그인 자물쇠 기능 ---
@@ -27,31 +24,31 @@ def check_password():
     def password_entered():
         if st.session_state["password"] == CORRECT_PASSWORD:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # 보안을 위해 입력 기록 지우기
+            del st.session_state["password"]  
         else:
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        # 처음 접속했을 때 보이는 화면
         st.markdown("<h2 style='text-align: center; color: #1A5276;'>🏭 사출 품질 MES</h2>", unsafe_allow_html=True)
         st.info("🔒 현장 데이터를 보호하기 위해 비밀번호를 입력해 주세요.")
         st.text_input("🔑 비밀번호", type="password", on_change=password_entered, key="password")
         return False
     
     elif not st.session_state["password_correct"]:
-        # 비밀번호가 틀렸을 때 보이는 화면
         st.markdown("<h2 style='text-align: center; color: #1A5276;'>🏭 사출 품질 MES</h2>", unsafe_allow_html=True)
         st.error("😕 비밀번호가 틀렸습니다. 다시 시도해 주세요.")
         st.text_input("🔑 비밀번호", type="password", on_change=password_entered, key="password")
         return False
     
     else:
-        # 비밀번호가 맞았을 때 (통과!)
         return True
 
-# 🚨 만약 비밀번호가 틀렸다면 여기서 프로그램을 멈춤! (아래 코드는 실행 안 됨)
 if not check_password():
     st.stop()
+
+# ==========================================
+# (이 아래부터는 원래 있던 @st.cache_data 데이터 불러오기 함수 등 메인 코드가 이어집니다!)
+# ==========================================
 
 # ==========================================
 # (이 아래부터는 원래 있던 데이터 불러오기 함수 등 메인 코드가 이어집니다!)
@@ -630,6 +627,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
