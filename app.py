@@ -240,7 +240,7 @@ with st.sidebar:
     
     menu = option_menu(
         menu_title=None, 
-        options=["📊 대시보드", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고"],
+        options=["📊 홈", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고"],
         default_index=0,
         styles={
             "container": {"padding": "5!important", "background-color": "transparent"},
@@ -650,6 +650,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
