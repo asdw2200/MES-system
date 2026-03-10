@@ -93,20 +93,20 @@ def delete_incoming_data_multiple(sheet_row_indices):
     for row_index in sorted(sheet_row_indices, reverse=True):
         sheet_incoming.delete_rows(row_index)
         
-# --- 🚀 4. 구글 시트 데이터 단일 셀(승인결과) 업데이트 함수 (신규 추가!) ---
+# --- 🚀 구글 시트 데이터 단일 셀(승인결과) 업데이트 함수 ---
 def update_approval_status(sheet_row_index, new_status):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" # 🚨여기에 87번 줄과 똑같은 진짜 주소를 꼭 넣어주세요!
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XIF7Z1tlQQV7zFUql5gjv-veBgltjm0Hb2vflEo8" # 실제 시트 주소 확인
     doc = client.open_by_url(sheet_url)
-    sheet1 = doc.get_worksheet(0) # 첫 번째 탭(검사 데이터)
+    sheet1 = doc.get_worksheet(0) 
     
     headers = sheet1.row_values(1)
-    if "승인확인" in headers:
-        col_index = headers.index("승인확인") + 1
-        # 해당 행(row), 열(col)에 O/X 값을 덮어씁니다.
+    # 🚨 구글 시트의 실제 제목인 '승인자 확인'으로 찾도록 수정 완료!
+    if "승인자 확인" in headers:
+        col_index = headers.index("승인자 확인") + 1
         sheet1.update_cell(sheet_row_index, col_index, new_status)
 # --- 📄 4. PDF 생성 함수 ---
 def create_report_pdf(dataframe, date_label, part_info):
@@ -202,13 +202,13 @@ if menu == "🏠 홈 대시보드":
     else:
         st.warning("데이터가 없습니다.")
 
-# --- [2] 📋 검사 현황(성적서) (결재 O/X 드롭다운 및 세로형 상세보기 적용) ---
+# --- [2] 📋 검사 현황(성적서) (결재 O/X 기능 - 이름표 수정 완료) ---
 elif menu == "📋 검사 현황(성적서)":
     st.title("📋 기간별 데이터 조회 및 성적서 결재")
     if not df.empty:
-        # '승인확인' 열이 없으면 기본값(대기)으로 채워서 에러 방지
-        if "승인확인" not in df.columns:
-            df["승인확인"] = "대기"
+        # 🚨 파이썬 내부에서도 '승인자 확인'으로 인식하도록 모두 수정
+        if "승인자 확인" not in df.columns:
+            df["승인자 확인"] = "대기"
             
         min_date, max_date = df["검사일자_dt"].min().date(), df["검사일자_dt"].max().date()
         c1, c2, c3 = st.columns([2, 2, 1])
@@ -232,45 +232,43 @@ elif menu == "📋 검사 현황(성적서)":
         label = f"{start} ~ {end}"
         st.success(f"✅ {label} 조회 결과 ({len(final_df)}건)")
 
-        # 🌟 1. 메인 표에 '승인확인' 열 추가
-        core_cols = ["승인확인", "차종", "검사일자", "검사자", "설비번호", "품명", "품번"]
+        # 🌟 1. 메인 표에 '승인자 확인' 열 추가
+        core_cols = ["승인자 확인", "차종", "검사일자", "검사자", "설비번호", "품명", "품번"]
         available_cols = [c for c in core_cols if c in final_df.columns]
         view_df = final_df[available_cols].copy()
         
         view_df.insert(0, "상세보기", False)
         
         # 빈칸이면 '대기'로 표시
-        view_df['승인확인'] = view_df['승인확인'].replace({'': '대기', 'nan': '대기', None: '대기'})
+        view_df['승인자 확인'] = view_df['승인자 확인'].replace({'': '대기', 'nan': '대기', None: '대기'})
 
         st.write("👉 **책임자 결재:** 표 안의 `[✍️ 승인확인]` 칸을 더블클릭하여 O, X를 선택한 후, 아래 저장 버튼을 누르세요.")
         
-        # 🌟 2. 표 렌더링 (승인확인 열만 드롭다운으로 수정 가능하게 오픈!)
+        # 🌟 2. 표 렌더링 (승인자 확인 열만 조작 가능하게 오픈!)
         edited_df = st.data_editor(
             view_df,
             column_config={
                 "상세보기": st.column_config.CheckboxColumn("🔍 상세보기", default=False),
-                "승인확인": st.column_config.SelectboxColumn("✍️ 승인확인", options=["대기", "O", "X"], required=True)
+                # 화면에 보이는 라벨은 "✍️ 승인확인"으로 예쁘게 유지하고, 실제 데이터 통신은 "승인자 확인"으로 함
+                "승인자 확인": st.column_config.SelectboxColumn("✍️ 승인확인", options=["대기", "O", "X"], required=True)
             },
-            # 승인확인과 상세보기만 조작 가능하고 나머지는 잠금
-            disabled=[c for c in available_cols if c != "승인확인"], 
+            disabled=[c for c in available_cols if c != "승인자 확인"], 
             hide_index=True,
             use_container_width=True,
-            key="approval_editor" # 화면 새로고침 시 데이터 꼬임 방지
+            key="approval_editor" 
         )
 
         # 🌟 3. 결재(O/X) 변경 사항 감지 및 저장 버튼 표시
-        # 원본과 수정본을 비교해서 바뀐 항목만 찾아냅니다.
         changes = []
         for idx in view_df.index:
-            old_val = str(view_df.loc[idx, "승인확인"]).strip()
-            new_val = str(edited_df.loc[idx, "승인확인"]).strip()
+            old_val = str(view_df.loc[idx, "승인자 확인"]).strip()
+            new_val = str(edited_df.loc[idx, "승인자 확인"]).strip()
             if old_val != new_val:
-                # 구글 시트의 실제 행 번호 = 파이썬 인덱스 + 2 (1번은 제목줄이므로)
                 changes.append((idx + 2, new_val))
 
         if changes:
             st.warning(f"⚠️ {len(changes)}건의 결재 상태가 변경되었습니다. 반드시 아래 저장 버튼을 눌러 확정해 주세요!")
-            if st.button("💾", type="primary", use_container_width=True):
+            if st.button("💾 변경된 승인 결과 구글 시트에 최종 저장", type="primary", use_container_width=True):
                 with st.spinner("구글 시트에 결재 내역을 업데이트하는 중입니다..."):
                     for sheet_row, new_val in changes:
                         update_approval_status(sheet_row, new_val)
@@ -532,6 +530,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
