@@ -234,13 +234,17 @@ if st.sidebar.button("🔄 데이터 강제 새로고침"):
     st.cache_data.clear()
     st.rerun()
 
-# --- 📌 사이드바 메뉴 (화려한 블록 디자인 적용) ---
+# --- 📌 사이드바 메뉴 (화려한 블록 디자인 적용 완료) ---
 with st.sidebar:
-    st.markdown("<h3 style='text-align: center;'>🏭 사출 품질 MES</h3>", unsafe_allow_html=True)
+    # 1. 로고 및 타이틀
+    st.markdown("<h2 style='text-align: center; color: #1A5276;'>🏭 사출 품질 MES</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: gray; font-size: 12px;'>Quality Management System</p>", unsafe_allow_html=True)
+    st.markdown("---")
     
+    # 2. 고급 블록 메뉴
     menu = option_menu(
         menu_title=None, 
-        options=["📊 홈", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고"],
+        options=["📊 대시보드", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고"],
         default_index=0,
         styles={
             "container": {"padding": "5!important", "background-color": "transparent"},
@@ -253,9 +257,17 @@ with st.sidebar:
             },
         }
     )
+    
     st.markdown("---")
+    
+    # 3. 데이터 새로고침 버튼 (필수 기능 유지!)
+    if st.button("🔄 데이터 강제 새로고침", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
-# 🚨 여기가 복사 중 실수로 지워졌던 부분입니다! (대시보드 복구 완료) 🚨
+# --- 화면 출력부 시작 ---
+if menu == "📊 대시보드":
+# (이 아래로는 대시보드 코드가 쭉 이어집니다)
 if menu == "📊 대시보드":
     st.title("📊 실시간 품질 현황")
     if not df.empty:
@@ -650,6 +662,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
