@@ -99,7 +99,7 @@ def update_approval_status(sheet_row_index, new_status):
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XIF7Z1tlQQV7zFUql5gjv-veBgltjm0Hb2vflEo8" # 실제 시트 주소 확인
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" # 실제 시트 주소 확인
     doc = client.open_by_url(sheet_url)
     sheet1 = doc.get_worksheet(0) 
     
@@ -530,6 +530,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
