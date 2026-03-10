@@ -1,4 +1,15 @@
 import streamlit as st
+# (원래 있던 import 문들...)
+
+# 🌟 웹사이트 탭 이름과 설치 아이콘을 완벽하게 바꿔주는 마법의 코드
+st.set_page_config(
+    page_title="사출 품질 MES",  # 바탕화면 앱 및 인터넷 탭 이름
+    page_icon="🏭",           # 바탕화면 앱 아이콘 (공장 모양 이모지)
+    layout="wide"             # (보너스) 화면을 양옆으로 넓게 꽉 차게 쓰기!
+)
+
+# --- 🔐 로그인 자물쇠 기능 ---
+# (이하 기존 코드 쭉 이어짐...)
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -620,6 +631,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
