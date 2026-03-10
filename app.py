@@ -283,7 +283,7 @@ elif menu == "📋 검사 현황(성적서)":
             st.markdown("---")
             st.subheader("🔎 상세 검사 결과")
             
-for idx in selected_indices:
+            for idx in selected_indices:
                 row_data = final_df.loc[idx]
                 
                 # 유령 칸들 완벽 차단 명단
@@ -534,6 +534,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
