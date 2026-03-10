@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 st.set_page_config(page_title="사출 품질 MES 시스템", page_icon="🏭", layout="wide")
 
 # --- 🚀 1. 데이터 로드 함수 ---
-@st.cache_data(ttl=5) 
+@st.cache_data(ttl=600) # 10분 동안은 구글에 안 물어보고 메모리에서 즉시 꺼냄! 
 def load_all_data():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds_dict = dict(st.secrets["gcp_service_account"])
@@ -532,6 +532,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
