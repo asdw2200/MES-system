@@ -160,7 +160,13 @@ def create_report_pdf(dataframe, date_label, part_info):
 # --- 🛰️ 시스템 가동 ---
 df, df_master, df_sub_master, df_tool, df_incoming = load_all_data()
 
-st.sidebar.title("🏭 사출 품질 MES")
+st.sidebar.markdown("""
+    <div style='text-align: center; margin-bottom: 20px;'>
+        <h2 style='color: #1A5276; font-weight: bold;'>🏭 사출 품질 MES</h2>
+        <span style='color: #7F8C8D; font-size: 14px;'>Quality Management System</span>
+        <hr style='margin-top: 10px; margin-bottom: 10px;'>
+    </div>
+""", unsafe_allow_html=True)
 
 pending_count = 0
 if not df_incoming.empty and "진행상태" in df_incoming.columns:
@@ -473,6 +479,7 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
 
 
 
