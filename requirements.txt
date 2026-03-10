@@ -4,3 +4,4 @@ gspread
 oauth2client
 fpdf
 plotly
+streamlit-option-menu
