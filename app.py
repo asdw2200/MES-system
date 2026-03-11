@@ -859,13 +859,15 @@ elif menu == "📋 현장 검사 등록":
                 st.subheader(f"🔍 [{part_num}] {selected_part} 검사 입력")
                 
                 with st.form("inspection_form"):
-                    c1, c2 = st.columns(2)
+                    # 🌟 1. 가로를 3칸으로 나누고 첫 번째 칸에 달력(날짜)을 넣습니다!
+                    c1, c2, c3 = st.columns(3)
                     
-                    # 🌟 1. 검사자 이름을 드롭다운으로 변경! (여기에 실제 작업자분들 이름을 적어주세요)
-                    inspector_list = ["함인철", "김윤곤"] 
-                    inspector = c1.selectbox("👨‍🔧 검사자 이름", inspector_list)
+                    insp_date = c1.date_input("📅 검사 일자") # 기본값은 오늘 날짜로 뜹니다
                     
-                    insp_type = c2.selectbox("🏷️ 검사 구분", ["초물", "중물", "종물"])
+                    inspector_list = ["선택 안함", "함인철", "홍길동", "김철수", "김윤곤"] 
+                    inspector = c2.selectbox("👨‍🔧 검사자 이름", inspector_list)
+                    
+                    insp_type = c3.selectbox("🏷️ 검사 구분", ["초물", "중물", "종물"])
                     
                     st.markdown("##### 📝 측정 항목 입력")
                     results = {}
@@ -888,7 +890,6 @@ elif menu == "📋 현장 검사 등록":
                         for i in range(sample_cnt):
                             item_key = f"{item}-{i+1}" 
                             with cols[i]:
-                                # 🌟 2. '1회차' 대신 'N=1'로 이름 변경!
                                 if not is_numeric:
                                     results[item_key] = st.selectbox(f"N={i+1}", ["OK", "NG"], key=item_key)
                                 else:
@@ -898,7 +899,6 @@ elif menu == "📋 현장 검사 등록":
                     submit_btn = st.form_submit_button("💾 검사 결과 저장", type="primary", use_container_width=True)
                     
                     if submit_btn:
-                        # 검사자를 선택하지 않고 넘어가려 할 때 경고!
                         if inspector == "선택 안함":
                             st.error("⚠️ 검사자 이름을 선택해 주세요!")
                         else:
@@ -910,8 +910,11 @@ elif menu == "📋 현장 검사 등록":
                                     ws_log = doc.add_worksheet(title="현장검사기록", rows="1000", cols="10")
                                     ws_log.append_row(["검사일시", "검사구분", "품번", "품명", "검사자", "측정결과"])
                                     
-                                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                new_row = [now, insp_type, part_num, selected_part, inspector, result_str]
+                                # 🌟 2. 선택한 날짜에 현재 시간(시:분:초)을 조합해서 저장합니다.
+                                current_time = datetime.now().strftime("%H:%M:%S")
+                                saved_datetime = f"{insp_date.strftime('%Y-%m-%d')} {current_time}"
+                                
+                                new_row = [saved_datetime, insp_type, part_num, selected_part, inspector, result_str]
                                 ws_log.append_row(new_row)
                                 
                                 st.success("✅ 검사 결과가 성공적으로 저장되었습니다!")
@@ -922,7 +925,6 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
-
 
 
 
