@@ -316,12 +316,13 @@ if menu == "📊 대시보드":
 
 elif menu == "📋 검사 현황(성적서)":
     st.title("📋 현장 검사 기록 현황")
-    st.info("💡 표 왼쪽의 '선택' 칸을 체크하면 아래에 상세 수치 데이터가 표시됩니다.")
+    st.info("💡 표 왼쪽의 '선택' 칸을 체크하면 상세 내용을 보거나 데이터를 삭제할 수 있습니다.")
 
-    # 🚨 여기에 진짜 구글 시트 주소 넣기!
+    # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     
     try:
+        # --- 출입증 코드 ---
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
         client = gspread.authorize(creds)
@@ -346,7 +347,6 @@ elif menu == "📋 검사 현황(성적서)":
                     for item in items:
                         if ": " in item:
                             k, v = item.split(": ", 1)
-                            # 🌟 핵심: '중량-1' 이라는 글자에서 '-1'을 떼고 '중량'으로 스펙을 검색합니다!
                             base_k = k.split("-")[0] 
                             spec = df_master[(df_master["품명"] == part_name) & (df_master["검사항목"] == base_k)]
                             if not spec.empty:
@@ -380,7 +380,30 @@ elif menu == "📋 검사 현황(성적서)":
                 
                 if not selected_rows.empty:
                     st.markdown("---")
-                    st.subheader("🔍 선택된 검사 상세 수치")
+                    
+                    # 🌟 삭제 버튼을 제목 옆에 예쁘게 배치합니다!
+                    c1, c2 = st.columns([8, 2])
+                    with c1:
+                        st.subheader("🔍 선택된 검사 상세 수치")
+                    with c2:
+                        if st.button("🗑️ 선택 데이터 삭제", use_container_width=True):
+                            with st.spinner("구글 시트에서 삭제 중입니다..."):
+                                # 1. 원본 데이터에서 선택된 행을 제거
+                                df_remain = df_log.drop(selected_rows.index)
+                                
+                                # 2. 다시 시간순(오래된게 위로 오게)으로 뒤집기
+                                df_remain = df_remain.iloc[::-1].reset_index(drop=True)
+                                
+                                # 3. 구글 시트용으로 불필요한 열(선택, 요약결과) 제거
+                                df_to_save = df_remain.drop(columns=["선택", "요약결과"])
+                                
+                                # 4. 구글 시트 내용 비우고 남은 데이터 덮어쓰기
+                                ws_log.clear()
+                                updated_data = [df_to_save.columns.values.tolist()] + df_to_save.values.tolist()
+                                ws_log.update("A1", updated_data)
+                                
+                                st.success("✅ 선택한 검사 기록이 삭제되었습니다!")
+                                st.rerun() # 화면 새로고침
                     
                     for idx, row in selected_rows.iterrows():
                         with st.container():
@@ -389,7 +412,6 @@ elif menu == "📋 검사 현황(성적서)":
                             
                             results_list = row['측정결과'].split(" / ")
                             
-                            # 🌟 시료가 많아지면 옆으로 너무 길어지므로 4개 단위로 줄바꿈!
                             num_cols = 4
                             for i in range(0, len(results_list), num_cols):
                                 cols = st.columns(num_cols)
@@ -900,6 +922,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
