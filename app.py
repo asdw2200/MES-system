@@ -381,64 +381,67 @@ elif menu == "📋 검사 현황(성적서)":
                 if not selected_rows.empty:
                     st.markdown("---")
                     
-                    # 🌟 삭제 버튼을 제목 옆에 예쁘게 배치합니다!
                     c1, c2 = st.columns([8, 2])
                     with c1:
                         st.subheader("🔍 선택된 검사 상세 수치")
                     with c2:
                         if st.button("🗑️ 선택 데이터 삭제", use_container_width=True):
                             with st.spinner("구글 시트에서 삭제 중입니다..."):
-                                # 1. 원본 데이터에서 선택된 행을 제거
                                 df_remain = df_log.drop(selected_rows.index)
-                                
-                                # 2. 다시 시간순(오래된게 위로 오게)으로 뒤집기
                                 df_remain = df_remain.iloc[::-1].reset_index(drop=True)
-                                
-                                # 3. 구글 시트용으로 불필요한 열(선택, 요약결과) 제거
                                 df_to_save = df_remain.drop(columns=["선택", "요약결과"])
-                                
-                                # 4. 구글 시트 내용 비우고 남은 데이터 덮어쓰기
                                 ws_log.clear()
                                 updated_data = [df_to_save.columns.values.tolist()] + df_to_save.values.tolist()
                                 ws_log.update("A1", updated_data)
-                                
                                 st.success("✅ 선택한 검사 기록이 삭제되었습니다!")
-                                st.rerun() # 화면 새로고침
+                                st.rerun() 
                     
                     for idx, row in selected_rows.iterrows():
                         with st.container():
                             st.markdown(f"#### 📦 [{row['검사구분']}] {row['품명']} ({row['품번']})")
                             st.caption(f"👨‍🔧 검사자: {row['검사자']} | 🕒 일시: {row['검사일시']}")
+                            st.markdown("<br>", unsafe_allow_html=True)
                             
                             results_list = row['측정결과'].split(" / ")
                             
-                            num_cols = 4
-                            for i in range(0, len(results_list), num_cols):
-                                cols = st.columns(num_cols)
-                                for j, res in enumerate(results_list[i:i+num_cols]):
-                                    if ": " in res:
-                                        item_name, item_val = res.split(": ", 1)
-                                        base_item_name = item_name.split("-")[0]
-                                        
-                                        is_ng = False
-                                        spec_str = "" 
-                                        spec = df_master[(df_master["품명"] == row["품명"]) & (df_master["검사항목"] == base_item_name)]
-                                        
-                                        if not spec.empty:
-                                            min_v = spec.iloc[0]["최소값"]
-                                            max_v = spec.iloc[0]["최대값"]
-                                            try:
-                                                float(min_v)
-                                                spec_str = f" (Spec: {min_v}~{max_v})"
-                                                if not (float(min_v) <= float(item_val) <= float(max_v)): is_ng = True
-                                            except: 
-                                                spec_str = f" (기준: {min_v})"
-                                                if item_val == "NG": is_ng = True
-                                                    
-                                        display_val = f"🔴 {item_val}{spec_str}" if is_ng else f"{item_val}{spec_str}"
-                                        cols[j].metric(label=item_name, value=display_val)
-                                    else:
-                                        cols[j].write(res)
+                            # 🌟 1. 데이터를 '중량', '두께', '외관' 등 뿌리(항목)별로 예쁘게 분류합니다!
+                            grouped_results = {}
+                            for res in results_list:
+                                if ": " in res:
+                                    i_name, i_val = res.split(": ", 1)
+                                    b_name = i_name.split("-")[0] # '중량-1' 에서 '중량'만 뽑아냄
+                                    if b_name not in grouped_results:
+                                        grouped_results[b_name] = []
+                                    grouped_results[b_name].append((i_name, i_val))
+                            
+                            # 🌟 2. 분류된 항목별로 한 줄씩 띄워줍니다!
+                            for base_item_name, items in grouped_results.items():
+                                st.markdown(f"##### 📌 {base_item_name}") # 예: 📌 중량
+                                
+                                cols = st.columns(len(items)) # 시료 개수만큼만 칸을 쪼갬
+                                
+                                for j, (item_name, item_val) in enumerate(items):
+                                    is_ng = False
+                                    spec_str = "" 
+                                    spec = df_master[(df_master["품명"] == row["품명"]) & (df_master["검사항목"] == base_item_name)]
+                                    
+                                    if not spec.empty:
+                                        min_v = spec.iloc[0]["최소값"]
+                                        max_v = spec.iloc[0]["최대값"]
+                                        try:
+                                            float(min_v)
+                                            spec_str = f" (Spec: {min_v}~{max_v})"
+                                            if not (float(min_v) <= float(item_val) <= float(max_v)): is_ng = True
+                                        except: 
+                                            spec_str = f" (기준: {min_v})"
+                                            if item_val == "NG": is_ng = True
+                                                
+                                    display_val = f"🔴 {item_val}{spec_str}" if is_ng else f"{item_val}{spec_str}"
+                                    cols[j].metric(label=item_name, value=display_val)
+                                    
+                                # 항목이 끝날 때마다 연한 점선으로 구분해줌
+                                st.markdown("<hr style='margin: 10px 0px; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True) 
+                            
                             st.markdown("---") 
                 else:
                     st.markdown("---")
@@ -925,6 +928,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
