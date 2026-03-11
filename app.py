@@ -314,7 +314,7 @@ if menu == "📊 대시보드":
         st.error(f"오류가 발생했습니다: {e}")
 
 
-elif menu == "📋 검사 현황":
+elif menu == "📋 검사 현황(성적서)":
     st.title("📋 현장 검사 기록 현황")
     st.info("💡 표 왼쪽의 '선택' 칸을 체크하면 상세 내용을 보거나 데이터를 삭제할 수 있습니다.")
 
@@ -322,6 +322,7 @@ elif menu == "📋 검사 현황":
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     
     try:
+        # --- 출입증 코드 ---
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
         client = gspread.authorize(creds)
@@ -352,13 +353,17 @@ elif menu == "📋 검사 현황":
                                 min_v = spec.iloc[0]["최소값"]
                                 max_v = spec.iloc[0]["최대값"]
                                 try:
-                                    if float(min_v) <= float(v) <= float(max_v): judgments.append(f"{k}: OK")
-                                    else: judgments.append(f"{k}: 🔴NG")
+                                    if float(min_v) <= float(v) <= float(max_v):
+                                        judgments.append(f"{k}: OK")
+                                    else:
+                                        judgments.append(f"{k}: 🔴NG")
                                 except:
                                     if v == "NG": judgments.append(f"{k}: 🔴NG")
                                     else: judgments.append(f"{k}: OK")
-                            else: judgments.append(f"{k}: {v}")
-                        else: judgments.append(item)
+                            else:
+                                judgments.append(f"{k}: {v}")
+                        else:
+                            judgments.append(item)
                     return " / ".join(judgments)
 
                 df_log["요약결과"] = df_log.apply(lambda x: make_judgment_str(x["품명"], x["측정결과"]), axis=1)
@@ -398,17 +403,22 @@ elif menu == "📋 검사 현황":
                             st.markdown("<br>", unsafe_allow_html=True)
                             
                             results_list = row['측정결과'].split(" / ")
+                            
+                            # 🌟 1. 데이터를 '중량', '두께', '외관' 등 뿌리(항목)별로 예쁘게 분류합니다!
                             grouped_results = {}
                             for res in results_list:
                                 if ": " in res:
                                     i_name, i_val = res.split(": ", 1)
-                                    b_name = i_name.split("-")[0] 
-                                    if b_name not in grouped_results: grouped_results[b_name] = []
+                                    b_name = i_name.split("-")[0] # '중량-1' 에서 '중량'만 뽑아냄
+                                    if b_name not in grouped_results:
+                                        grouped_results[b_name] = []
                                     grouped_results[b_name].append((i_name, i_val))
                             
+                            # 🌟 2. 분류된 항목별로 한 줄씩 띄워줍니다!
                             for base_item_name, items in grouped_results.items():
-                                st.markdown(f"##### 📌 {base_item_name}") 
-                                cols = st.columns(len(items)) 
+                                st.markdown(f"##### 📌 {base_item_name}") # 예: 📌 중량
+                                
+                                cols = st.columns(len(items)) # 시료 개수만큼만 칸을 쪼갬
                                 
                                 for j, (item_name, item_val) in enumerate(items):
                                     is_ng = False
@@ -428,8 +438,15 @@ elif menu == "📋 검사 현황":
                                                 
                                     display_val = f"🔴 {item_val}{spec_str}" if is_ng else f"{item_val}{spec_str}"
                                     cols[j].metric(label=item_name, value=display_val)
+                                    
+                                # 항목이 끝날 때마다 연한 점선으로 구분해줌
                                 st.markdown("<hr style='margin: 10px 0px; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True) 
+                            
                             st.markdown("---") 
+                else:
+                    st.markdown("---")
+                    st.subheader("🖨️ 성적서 PDF 출력")
+                    st.warning("💡 PDF 출력 기능은 '한글 폰트 깨짐 방지' 세팅 중입니다.")
             else:
                 st.info("아직 저장된 검사 기록이 없습니다.")
         except Exception as e:
@@ -912,6 +929,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
