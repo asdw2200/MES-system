@@ -695,6 +695,100 @@ elif menu == "⚙️ 기준정보 관리":
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
 
+elif menu == "📋 현장 검사 등록":
+    st.title("📋 현장 검사(초/중/종물) 등록")
+    st.info("💡 품명을 선택하면 등록된 스펙(기준값)이 자동으로 나타납니다.")
+
+    # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
+    
+    try:
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
+        client = gspread.authorize(creds)
+        doc = client.open_by_url(sheet_url)
+        
+        ws_master = doc.worksheet("기준정보")
+        data = ws_master.get_all_values()
+        
+        if len(data) > 1:
+            df_master = pd.DataFrame(data[1:], columns=data[0])
+            part_names = df_master["품명"].dropna().unique().tolist()
+            
+            selected_part = st.selectbox("📦 검사할 품명을 선택하세요", ["선택 안함"] + part_names)
+            
+            if selected_part != "선택 안함":
+                st.markdown("---")
+                spec_df = df_master[df_master["품명"] == selected_part]
+                part_num = spec_df.iloc[0]["품번"] 
+                
+                st.subheader(f"🔍 [{part_num}] {selected_part} 검사 입력")
+                
+                with st.form("inspection_form"):
+                    c1, c2 = st.columns(2)
+                    
+                    # 🌟 1. 검사자 이름을 드롭다운으로 변경! (여기에 실제 작업자분들 이름을 적어주세요)
+                    inspector_list = ["함인철", "김윤곤"] 
+                    inspector = c1.selectbox("👨‍🔧 검사자 이름", inspector_list)
+                    
+                    insp_type = c2.selectbox("🏷️ 검사 구분", ["초물", "중물", "종물"])
+                    
+                    st.markdown("##### 📝 측정 항목 입력")
+                    results = {}
+                    
+                    for index, row in spec_df.iterrows():
+                        item = row["검사항목"]
+                        min_v = row["최소값"]
+                        max_v = row["최대값"]
+                        
+                        try: sample_cnt = int(row["시료수"])
+                        except: sample_cnt = 1 
+                        
+                        st.markdown(f"**📌 {item} (기준: {min_v}~{max_v} / 시료 {sample_cnt}개)**")
+                        cols = st.columns(sample_cnt) 
+                        
+                        is_numeric = True
+                        try: float(min_v)
+                        except: is_numeric = False
+                            
+                        for i in range(sample_cnt):
+                            item_key = f"{item}-{i+1}" 
+                            with cols[i]:
+                                # 🌟 2. '1회차' 대신 'N=1'로 이름 변경!
+                                if not is_numeric:
+                                    results[item_key] = st.selectbox(f"N={i+1}", ["OK", "NG"], key=item_key)
+                                else:
+                                    results[item_key] = st.text_input(f"N={i+1}", placeholder="측정값", key=item_key)
+                        st.markdown("<br>", unsafe_allow_html=True)
+                            
+                    submit_btn = st.form_submit_button("💾 검사 결과 저장", type="primary", use_container_width=True)
+                    
+                    if submit_btn:
+                        # 검사자를 선택하지 않고 넘어가려 할 때 경고!
+                        if inspector == "선택 안함":
+                            st.error("⚠️ 검사자 이름을 선택해 주세요!")
+                        else:
+                            with st.spinner("구글 시트에 안전하게 저장 중입니다..."):
+                                result_str = " / ".join([f"{k}: {v}" for k, v in results.items() if v != ""])
+                                
+                                try: ws_log = doc.worksheet("현장검사기록")
+                                except:
+                                    ws_log = doc.add_worksheet(title="현장검사기록", rows="1000", cols="10")
+                                    ws_log.append_row(["검사일시", "검사구분", "품번", "품명", "검사자", "측정결과"])
+                                    
+                                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                new_row = [now, insp_type, part_num, selected_part, inspector, result_str]
+                                ws_log.append_row(new_row)
+                                
+                                st.success("✅ 검사 결과가 성공적으로 저장되었습니다!")
+                                st.balloons() 
+                                
+        else:
+            st.warning("⚠️ 등록된 기준정보가 없습니다. [⚙️ 기준정보 관리]에서 먼저 부품을 등록해 주세요.")
+            
+    except Exception as e:
+        st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
