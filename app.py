@@ -258,7 +258,7 @@ if menu == "📊 대시보드":
 
 elif menu == "📋 검사 현황(성적서)":
     st.title("📋 현장 검사 기록 현황")
-    st.info("💡 표 왼쪽의 '선택' 칸을 체크하면 아래에 상세 내용이 표시됩니다.")
+    st.info("💡 표 왼쪽의 '선택' 칸을 체크하면 아래에 상세 수치 데이터가 표시됩니다.")
 
     # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
@@ -271,6 +271,11 @@ elif menu == "📋 검사 현황(성적서)":
         doc = client.open_by_url(sheet_url)
         
         try:
+            # 🌟 판정을 위해 '기준정보' 탭도 몰래 가져옵니다!
+            ws_master = doc.worksheet("기준정보")
+            master_data = ws_master.get_all_values()
+            df_master = pd.DataFrame(master_data[1:], columns=master_data[0]) if len(master_data) > 1 else pd.DataFrame()
+            
             ws_log = doc.worksheet("현장검사기록")
             data = ws_log.get_all_values()
             
@@ -278,59 +283,98 @@ elif menu == "📋 검사 현황(성적서)":
                 df_log = pd.DataFrame(data[1:], columns=data[0])
                 df_log = df_log.iloc[::-1].reset_index(drop=True) # 최신순 정렬
                 
-                # 🌟 1. 맨 왼쪽에 '선택(체크박스)' 열을 추가합니다!
+                # 🌟 마법의 함수: 숫자를 보고 합격/불합격을 판정해줌!
+                def make_judgment_str(part_name, result_string):
+                    if df_master.empty: return result_string
+                    items = result_string.split(" / ")
+                    judgments = []
+                    for item in items:
+                        if ": " in item:
+                            k, v = item.split(": ", 1)
+                            spec = df_master[(df_master["품명"] == part_name) & (df_master["검사항목"] == k)]
+                            if not spec.empty:
+                                min_v = spec.iloc[0]["최소값"]
+                                max_v = spec.iloc[0]["최대값"]
+                                try:
+                                    # 숫자인 경우 스펙 안에 들어오는지 검사
+                                    if float(min_v) <= float(v) <= float(max_v):
+                                        judgments.append(f"{k}: OK")
+                                    else:
+                                        judgments.append(f"{k}: 🔴NG")
+                                except:
+                                    judgments.append(f"{k}: {v}") # 텍스트(OK/NG)인 경우 그대로
+                            else:
+                                judgments.append(f"{k}: {v}")
+                        else:
+                            judgments.append(item)
+                    return " / ".join(judgments)
+
+                # '요약결과' 컬럼을 새로 만들어서 OK/NG 문자열 담기
+                df_log["요약결과"] = df_log.apply(lambda x: make_judgment_str(x["품명"], x["측정결과"]), axis=1)
+                
+                # 맨 왼쪽에 체크박스 추가
                 df_log.insert(0, "선택", False)
                 
                 st.success(f"✅ 총 {len(df_log)}건의 검사 기록이 안전하게 보관되어 있습니다.")
                 
-                # 🌟 2. 엑셀 표를 '수정 가능(체크 가능)'한 상태로 띄워줍니다.
+                # 🌟 데이터 띄우기: 원본 숫자는 숨기고, OK/NG 결과만 표에 보여줍니다!
                 edited_df = st.data_editor(
                     df_log,
                     hide_index=True,
                     use_container_width=True,
                     column_config={
-                        "선택": st.column_config.CheckboxColumn("선택", default=False, width="small")
+                        "선택": st.column_config.CheckboxColumn("선택", default=False, width="small"),
+                        "측정결과": None, # 🚨 핵심: 원본 숫자 데이터는 표에서 숨김!
+                        "요약결과": st.column_config.TextColumn("측정결과(판정)") # OK/NG 열의 이름 변경
                     }
                 )
                 
-                # 🌟 3. 체크박스에 체크한 줄(데이터)만 쏙 뽑아냅니다.
                 selected_rows = edited_df[edited_df["선택"] == True]
                 
-                # 🌟 4. 체크된 데이터가 있다면, 아래에 상세보기를 예쁘게 띄워줍니다.
+                # 🌟 체크박스 선택 시 아래에 숫자 데이터 상세보기 띄우기
                 if not selected_rows.empty:
                     st.markdown("---")
-                    st.subheader("🔍 선택된 검사 상세 정보")
+                    st.subheader("🔍 선택된 검사 상세 수치")
                     
                     for idx, row in selected_rows.iterrows():
-                        # 깔끔한 네모 박스 안에 정보 담기
                         with st.container():
                             st.markdown(f"#### 📦 [{row['검사구분']}] {row['품명']} ({row['품번']})")
                             st.caption(f"👨‍🔧 검사자: {row['검사자']} | 🕒 일시: {row['검사일시']}")
                             
-                            # '중량: OK / 두께: OK' 같은 글자를 예쁜 블록으로 쪼개서 보여주기
+                            # 상세보기는 숨겨뒀던 원본 숫자('측정결과')를 꺼내서 보여줌!
                             results_list = row['측정결과'].split(" / ")
                             cols = st.columns(len(results_list))
                             
                             for i, res in enumerate(results_list):
                                 if ": " in res:
                                     item_name, item_val = res.split(": ", 1)
-                                    # 큰 숫자로 보여주는 예쁜 UI
-                                    cols[i].metric(label=item_name, value=item_val)
+                                    
+                                    # 상세 보기에서도 스펙 벗어나면 🔴 표시 달아주기
+                                    is_ng = False
+                                    spec = df_master[(df_master["품명"] == row["품명"]) & (df_master["검사항목"] == item_name)]
+                                    if not spec.empty:
+                                        try:
+                                            if not (float(spec.iloc[0]["최소값"]) <= float(item_val) <= float(spec.iloc[0]["최대값"])):
+                                                is_ng = True
+                                        except: pass
+                                            
+                                    display_val = f"🔴 {item_val} (NG)" if is_ng else item_val
+                                    cols[i].metric(label=item_name, value=display_val)
                                 else:
                                     cols[i].write(res)
                             
-                            st.markdown("---") # 항목 간 가로줄
+                            st.markdown("---") 
                 
                 else:
                     st.markdown("---")
                     st.subheader("🖨️ 성적서 PDF 출력")
-                    st.warning("💡 PDF 출력 기능은 '한글 폰트 깨짐 방지' 세팅 중입니다. 위에서 표 체크박스가 잘 작동하는지 먼저 확인해 주세요!")
+                    st.warning("💡 PDF 출력 기능은 '한글 폰트 깨짐 방지' 세팅 중입니다.")
 
             else:
-                st.info("아직 저장된 검사 기록이 없습니다. [📋 현장 검사 등록]에서 첫 데이터를 입력해 보세요!")
+                st.info("아직 저장된 검사 기록이 없습니다.")
                 
         except Exception as e:
-            st.warning("아직 '현장검사기록' 탭이 없습니다. 데이터를 한 번 저장해 주세요.")
+            st.warning("아직 '현장검사기록' 탭이 없습니다.")
 
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
@@ -699,6 +743,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
