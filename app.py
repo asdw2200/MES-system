@@ -603,144 +603,95 @@ elif menu == "📥 수입자재 검사대기":
 
 elif menu == "⚙️ 기준정보 관리":
     st.title("⚙️ 부품별 기준정보(Spec) 관리")
-    st.info("💡 아래 표를 엑셀처럼 직접 수정하거나 새 행을 추가한 뒤, [💾 구글 시트에 저장] 버튼을 누르세요.")
 
     # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     
     try:
-        # --- 🌟 새로 추가된 마법의 출입증 코드 ---
+        # --- 출입증 코드 ---
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # (💡만약 위쪽 코드에서 st.secrets 이름을 다르게 쓰셨다면 그 이름으로 맞춰주세요!)
         creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
         client = gspread.authorize(creds)
-        # ----------------------------------------
-        
         doc = client.open_by_url(sheet_url)
         
-        try:
-            ws = doc.worksheet("기준정보")
-        except:
-            st.error("구글 시트에 '기준정보' 탭을 찾을 수 없습니다. 이름을 확인해 주세요!")
-            st.stop()
-            
-        # 1. 구글 시트에서 기존 데이터 싹 가져오기
+        ws = doc.worksheet("기준정보")
         data = ws.get_all_values()
+        
         if len(data) > 1:
             df_master = pd.DataFrame(data[1:], columns=data[0])
         else:
-            # 🌟 '품명' 칸을 추가해서 빈 표 만들기!
-            df_master = pd.DataFrame(columns=["품번", "품명", "검사항목", "시료수", "최소값", "최대값"])
+            # 차종이 맨 앞에 추가된 새로운 양식!
+            df_master = pd.DataFrame(columns=["차종", "품번", "품명", "검사항목", "시료수", "최소값", "최대값"])
+            
+        # ==========================================
+        # 🌟 1. 스마트 간편 등록기 (노가다 방지용!)
+        # ==========================================
+        st.markdown("### 🚀 신규 부품 간편 등록기")
+        st.info("💡 차종, 품번, 품명을 딱 한 번만 입력하고, 아래 항목만 적으세요. 파이썬이 알아서 합쳐서 저장합니다!")
         
-        # 2. 화면에 엑셀처럼 표 띄워주기
+        with st.container():
+            # 기본 정보 3가지는 위에서 한 번만 받음
+            c1, c2, c3 = st.columns(3)
+            new_car = c1.text_input("🚗 차종 (예: AX PE)")
+            new_part_num = c2.text_input("🔢 품번 (예: 97390-GX900)")
+            new_part_name = c3.text_input("📦 품명 (예: HOSE-SD DEFROSTER RH)")
+            
+            st.markdown("**📝 검사 항목 입력 (센스있게 기본 항목은 미리 적어뒀습니다!)**")
+            
+            # 관리자님이 매번 치기 귀찮으실까봐 중량, 두께, 외관을 미리 세팅해 뒀습니다!
+            empty_items = pd.DataFrame([
+                {"검사항목": "중량", "시료수": 3, "최소값": "", "최대값": ""},
+                {"검사항목": "두께", "시료수": 3, "최소값": "", "최대값": ""},
+                {"검사항목": "외관", "시료수": 3, "최소값": "BURR 없을 것", "최대값": ""},
+                {"검사항목": "", "시료수": 3, "최소값": "", "최대값": ""},
+                {"검사항목": "", "시료수": 3, "최소값": "", "최대값": ""}
+            ])
+            
+            # 항목만 입력하는 미니 엑셀 표
+            edited_new_items = st.data_editor(empty_items, num_rows="dynamic", hide_index=True, use_container_width=True)
+            
+            if st.button("➕ 위 내용으로 새 부품 등록하기", type="primary", use_container_width=True):
+                if not new_car or not new_part_num or not new_part_name:
+                    st.error("⚠️ 차종, 품번, 품명을 모두 입력해 주세요!")
+                else:
+                    # 항목 이름이 빈칸이 아닌 것만 골라냄
+                    valid_items = edited_new_items[edited_new_items["검사항목"].str.strip() != ""]
+                    if valid_items.empty:
+                        st.error("⚠️ 최소 1개 이상의 검사항목을 입력해 주세요!")
+                    else:
+                        with st.spinner("구글 시트에 똑똑하게 저장 중입니다..."):
+                            # 파이썬이 관리자님 대신 '차종, 품번, 품명'을 복사해서 표를 만들어 줍니다.
+                            new_rows = []
+                            for _, row in valid_items.iterrows():
+                                new_rows.append([new_car, new_part_num, new_part_name, row["검사항목"], row["시료수"], row["최소값"], row["최대값"]])
+                                
+                            # 구글 시트 맨 아래에 데이터 추가
+                            for row in new_rows:
+                                ws.append_row(row)
+                                
+                            st.success(f"✅ {new_part_name} 부품 기준정보 등록 완료!")
+                            st.cache_data.clear()
+                            st.rerun() # 화면 새로고침
+                            
+        st.markdown("---")
+        
+        # ==========================================
+        # 🌟 2. 전체 데이터 조회 및 수정 (기존 기능)
+        # ==========================================
+        st.markdown("### 📋 전체 기준정보 조회 및 수정")
+        st.caption("기존에 등록된 전체 데이터를 엑셀처럼 쓱쓱 수정하고 저장할 수 있습니다.")
+        
         edited_df = st.data_editor(df_master, num_rows="dynamic", use_container_width=True)
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # 3. 저장 버튼
-        if st.button("💾 수정한 기준정보 구글 시트에 완벽 저장하기", type="primary", use_container_width=True):
-            with st.spinner("구글 시트에 저장 중입니다..."):
+        if st.button("💾 수정한 전체 표 구글 시트에 덮어쓰기", use_container_width=True):
+            with st.spinner("구글 시트 전체 업데이트 중..."):
                 ws.clear()
                 updated_data = [edited_df.columns.values.tolist()] + edited_df.values.tolist()
                 ws.update("A1", updated_data)
                 
-                st.success("✅ 기준정보가 성공적으로 업데이트되었습니다!")
+                st.success("✅ 전체 기준정보가 성공적으로 업데이트되었습니다!")
                 st.cache_data.clear() 
                 
-    except Exception as e:
-        st.error(f"오류가 발생했습니다. 출입증 키 이름이나 주소를 확인해 주세요: {e}")
-
-elif menu == "📋 현장 검사 등록":
-    st.title("📋 현장 검사(초/중/종물) 등록")
-    st.info("💡 품명을 선택하면 등록된 스펙(기준값)이 자동으로 나타납니다.")
-
-    # 🚨 여기에 진짜 구글 시트 주소 넣기!
-    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
-    
-    try:
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
-        client = gspread.authorize(creds)
-        doc = client.open_by_url(sheet_url)
-        
-        ws_master = doc.worksheet("기준정보")
-        data = ws_master.get_all_values()
-        
-        if len(data) > 1:
-            df_master = pd.DataFrame(data[1:], columns=data[0])
-            part_names = df_master["품명"].dropna().unique().tolist()
-            
-            selected_part = st.selectbox("📦 검사할 품명을 선택하세요", ["선택 안함"] + part_names)
-            
-            if selected_part != "선택 안함":
-                st.markdown("---")
-                spec_df = df_master[df_master["품명"] == selected_part]
-                part_num = spec_df.iloc[0]["품번"] 
-                
-                st.subheader(f"🔍 [{part_num}] {selected_part} 검사 입력")
-                
-                with st.form("inspection_form"):
-                    c1, c2 = st.columns(2)
-                    
-                    # 🌟 1. 검사자 이름을 드롭다운으로 변경! (여기에 실제 작업자분들 이름을 적어주세요)
-                    inspector_list = ["함인철", "김윤곤"] 
-                    inspector = c1.selectbox("👨‍🔧 검사자 이름", inspector_list)
-                    
-                    insp_type = c2.selectbox("🏷️ 검사 구분", ["초물", "중물", "종물"])
-                    
-                    st.markdown("##### 📝 측정 항목 입력")
-                    results = {}
-                    
-                    for index, row in spec_df.iterrows():
-                        item = row["검사항목"]
-                        min_v = row["최소값"]
-                        max_v = row["최대값"]
-                        
-                        try: sample_cnt = int(row["시료수"])
-                        except: sample_cnt = 1 
-                        
-                        st.markdown(f"**📌 {item} (기준: {min_v}~{max_v} / 시료 {sample_cnt}개)**")
-                        cols = st.columns(sample_cnt) 
-                        
-                        is_numeric = True
-                        try: float(min_v)
-                        except: is_numeric = False
-                            
-                        for i in range(sample_cnt):
-                            item_key = f"{item}-{i+1}" 
-                            with cols[i]:
-                                # 🌟 2. '1회차' 대신 'N=1'로 이름 변경!
-                                if not is_numeric:
-                                    results[item_key] = st.selectbox(f"N={i+1}", ["OK", "NG"], key=item_key)
-                                else:
-                                    results[item_key] = st.text_input(f"N={i+1}", placeholder="측정값", key=item_key)
-                        st.markdown("<br>", unsafe_allow_html=True)
-                            
-                    submit_btn = st.form_submit_button("💾 검사 결과 저장", type="primary", use_container_width=True)
-                    
-                    if submit_btn:
-                        # 검사자를 선택하지 않고 넘어가려 할 때 경고!
-                        if inspector == "선택 안함":
-                            st.error("⚠️ 검사자 이름을 선택해 주세요!")
-                        else:
-                            with st.spinner("구글 시트에 안전하게 저장 중입니다..."):
-                                result_str = " / ".join([f"{k}: {v}" for k, v in results.items() if v != ""])
-                                
-                                try: ws_log = doc.worksheet("현장검사기록")
-                                except:
-                                    ws_log = doc.add_worksheet(title="현장검사기록", rows="1000", cols="10")
-                                    ws_log.append_row(["검사일시", "검사구분", "품번", "품명", "검사자", "측정결과"])
-                                    
-                                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                new_row = [now, insp_type, part_num, selected_part, inspector, result_str]
-                                ws_log.append_row(new_row)
-                                
-                                st.success("✅ 검사 결과가 성공적으로 저장되었습니다!")
-                                st.balloons() 
-                                
-        else:
-            st.warning("⚠️ 등록된 기준정보가 없습니다.")
-            
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
 
