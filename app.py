@@ -256,157 +256,53 @@ if menu == "📊 대시보드":
         st.info("아직 입력된 데이터가 없습니다.")
 
 
-# --- [2] 📋 검사 현황(성적서) (결재 O/X 기능 - 이름표 수정 완료) ---
 elif menu == "📋 검사 현황(성적서)":
-    st.title("📋 기간별 데이터 조회 및 성적서 결재")
-    if not df.empty:
-        # 🚨 파이썬 내부에서도 '승인자 확인'으로 인식하도록 모두 수정
-        if "승인자 확인" not in df.columns:
-            df["승인자 확인"] = "대기"
+    st.title("📋 현장 검사 기록 현황")
+    st.info("💡 [현장 검사 등록] 메뉴에서 입력한 최신 데이터가 이곳에 차곡차곡 쌓입니다.")
+
+    # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
+    sheet_url = "https://docs.google.com/spreadsheets/d/여기에_진짜_주소_넣기/edit" 
+    
+    try:
+        # --- 출입증 코드 ---
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
+        client = gspread.authorize(creds)
+        doc = client.open_by_url(sheet_url)
+        
+        try:
+            # 새로 만든 '현장검사기록' 탭에서 데이터를 불러옵니다!
+            ws_log = doc.worksheet("현장검사기록")
+            data = ws_log.get_all_values()
             
-        min_date, max_date = df["검사일자_dt"].min().date(), df["검사일자_dt"].max().date()
-        c1, c2, c3 = st.columns([2, 2, 1])
-        with c1: date_range = st.date_input("📅 기간 선택", value=(min_date, max_date))
-        
-        if isinstance(date_range, tuple) and len(date_range) == 2:
-            start, end = date_range
-            range_df = df[(df["검사일자_dt"].dt.date >= start) & (df["검사일자_dt"].dt.date <= end)].copy()
-        else:
-            range_df = df[df["검사일자_dt"].dt.date == date_range[0]].copy()
-            start = end = date_range[0]
-
-        with c2: all_parts = ["전체"] + sorted(list(range_df["품번"].unique()))
-        selected_part = st.selectbox("📦 품번 선택", all_parts)
-        with c3: st.write(""); show_na = st.checkbox("N/A 포함")
-
-        final_df = range_df.copy()
-        if selected_part != "전체": final_df = final_df[final_df["품번"] == selected_part]
-        if not show_na: final_df = final_df[~final_df["판정1"].str.upper().str.contains("N/A", na=False)]
-
-        label = f"{start} ~ {end}"
-        st.success(f"✅ {label} 조회 결과 ({len(final_df)}건)")
-
-        # 🌟 1. 메인 표에 '승인자 확인' 열 추가
-        core_cols = ["승인자 확인", "차종", "검사일자", "검사자", "설비번호", "품명", "품번"]
-        available_cols = [c for c in core_cols if c in final_df.columns]
-        view_df = final_df[available_cols].copy()
-        
-        view_df.insert(0, "상세보기", False)
-        
-        # 빈칸이면 '대기'로 표시
-        view_df['승인자 확인'] = view_df['승인자 확인'].replace({'': '대기', 'nan': '대기', None: '대기'})
-
-        st.write("👉 **책임자 결재:** 표 안의 `[✍️ 승인확인]` 칸을 더블클릭하여 O, X를 선택한 후, 아래 저장 버튼을 누르세요.")
-        
-        # 🌟 2. 표 렌더링 (승인자 확인 열만 조작 가능하게 오픈!)
-        edited_df = st.data_editor(
-            view_df,
-            column_config={
-                "상세보기": st.column_config.CheckboxColumn("🔍 상세보기", default=False),
-                # 화면에 보이는 라벨은 "✍️ 승인확인"으로 예쁘게 유지하고, 실제 데이터 통신은 "승인자 확인"으로 함
-                "승인자 확인": st.column_config.SelectboxColumn("✍️ 승인확인", options=["대기", "O", "X"], required=True)
-            },
-            disabled=[c for c in available_cols if c != "승인자 확인"], 
-            hide_index=True,
-            use_container_width=True,
-            key="approval_editor" 
-        )
-
-        # 🌟 3. 결재(O/X) 변경 사항 감지 및 저장 버튼 표시
-        changes = []
-        for idx in view_df.index:
-            old_val = str(view_df.loc[idx, "승인자 확인"]).strip()
-            new_val = str(edited_df.loc[idx, "승인자 확인"]).strip()
-            if old_val != new_val:
-                changes.append((idx + 2, new_val))
-
-        if changes:
-            st.warning(f"⚠️ {len(changes)}건의 결재 상태가 변경되었습니다. 반드시 아래 저장 버튼을 눌러 확정해 주세요!")
-            if st.button("💾 저장", type="primary", use_container_width=True):
-                with st.spinner("변경 내용을 업데이트하는 중입니다..."):
-                    for sheet_row, new_val in changes:
-                        update_approval_status(sheet_row, new_val)
-                st.success("✅ 승인(결재) 처리가 완벽하게 저장되었습니다!")
-                st.cache_data.clear()
-                st.rerun()
-
-        # 🌟 4. 세부 측정 데이터 폴더 (상세보기)
-        selected_indices = edited_df[edited_df["상세보기"] == True].index
-
-        if not selected_indices.empty:
-            st.markdown("---")
-            st.subheader("🔎 상세 검사 결과")
-            
-            import re # 정규식(글자 쪼개기) 도구 
-
-            for idx in selected_indices:
-                row_data = final_df.loc[idx]
+            if len(data) > 1:
+                # 데이터를 예쁜 표(DataFrame)로 변환
+                df_log = pd.DataFrame(data[1:], columns=data[0])
                 
-                # 유령 칸들 완벽 차단 명단
-                exclude_cols = available_cols + ["타임스탬프", "검사일자_dt", "ID", "id", "이메일 주소", "이메일", "1열", "2열", "3열", "4열", "5열", "6열"]
-                detail_data = row_data.drop(labels=[c for c in exclude_cols if c in row_data.index])
+                # 🌟 최신 데이터가 맨 위로 오도록 순서 뒤집기
+                df_log = df_log.iloc[::-1].reset_index(drop=True)
                 
-                ordered_base_names = [] 
-                parsed_data = {}
+                st.success(f"✅ 총 {len(df_log)}건의 검사 기록이 안전하게 보관되어 있습니다.")
                 
-                for col_name, val in detail_data.items():
-                    col_str = str(col_name).strip()
-                    
-                    # 🌟 마법의 복사기: '판정' 열은 값이 하나뿐이어도 1,2,3번 시료 칸에 모두 도장을 찍어줌!
-                    if col_str.startswith("판정"):
-                        if col_str not in parsed_data:
-                            parsed_data[col_str] = {}
-                            ordered_base_names.append(col_str)
-                        parsed_data[col_str]["1번 시료"] = val
-                        parsed_data[col_str]["2번 시료"] = val
-                        parsed_data[col_str]["3번 시료"] = val
-                        parsed_data[col_str]["공통 / 단일값"] = "-" # 판정의 공통 칸은 비워둠
-                        
-                    # '치수'는 공통 칸에 그대로 둠
-                    elif col_str.startswith("치수"):
-                        if col_str not in parsed_data:
-                            parsed_data[col_str] = {}
-                            ordered_base_names.append(col_str)
-                        parsed_data[col_str]["공통 / 단일값"] = val
-                    
-                    # 그 외 항목(중량, 두께, 외관 등)은 끝에 1~3이 있으면 시료 칸으로 보냄
-                    else:
-                        match = re.match(r'(.+?)([1-3])$', col_str) 
-                        if match:
-                            base_name = match.group(1).strip()     
-                            sample_num = match.group(2) + "번 시료" 
-                        else:
-                            base_name = col_str 
-                            sample_num = "공통 / 단일값"
-                            
-                        if base_name not in parsed_data:
-                            parsed_data[base_name] = {}
-                            ordered_base_names.append(base_name)
-                            
-                        parsed_data[base_name][sample_num] = val
-                        
-                # 🌟 기록해둔 순서대로 표 조립하기
-                rows = []
-                for base in ordered_base_names:
-                    row_dict = {"검사 항목": base}
-                    row_dict.update(parsed_data[base])
-                    rows.append(row_dict)
-                    
-                detail_table = pd.DataFrame(rows)
+                # 엑셀처럼 화면에 쫙 띄워주기
+                st.dataframe(df_log, use_container_width=True)
                 
-                # 열 순서 정렬
-                expected_cols = ['검사 항목', '공통 / 단일값', '1번 시료', '2번 시료', '3번 시료']
-                ordered_cols = [c for c in expected_cols if c in detail_table.columns]
-                detail_table = detail_table[ordered_cols].fillna("-") 
+                st.markdown("---")
                 
-                with st.expander(f"📂 {row_data.get('검사일자', '')} | {row_data.get('품명', '')} ({row_data.get('품번', '')})", expanded=True):
-                    st.dataframe(detail_table, hide_index=True, use_container_width=True)
-        
-        if st.button("📥 PDF 성적서 생성"):
-            pdf_data = create_report_pdf(final_df, label, selected_part)
-            b64 = base64.b64encode(pdf_data).decode()
-            href = f'<a href="data:application/pdf;base64,{b64}" download="{label}_성적서.pdf"><button style="width:100%; padding:15px; background-color:#1A5276; color:white; border:none; border-radius:10px; cursor:pointer;">💾 PDF 리포트 저장</button></a>'
-            st.markdown(href, unsafe_allow_html=True)
+                # (아까 에러 났던 PDF 기능은 다음 단계에서 한글 폰트 적용 후 완벽히 살릴 예정입니다!)
+                st.subheader("🖨️ 성적서 PDF 출력")
+                st.warning("💡 PDF 출력 기능은 '한글 폰트 깨짐 방지' 세팅 중입니다. 표가 잘 나오는지 먼저 확인해 주세요!")
+
+            else:
+                st.info("아직 저장된 검사 기록이 없습니다. [📋 현장 검사 등록]에서 첫 데이터를 입력해 보세요!")
+                
+        except:
+            st.warning("아직 '현장검사기록' 탭이 없습니다. [📋 현장 검사 등록]에서 검사를 한 번 완료해 주세요!")
+
+    except Exception as e:
+        st.error(f"오류가 발생했습니다: {e}")
+
+
 # --- [3] 📈 SPC 관리도 (평균값 적용 및 고급 차트 업그레이드) ---
 elif menu == "📈 SPC 관리도":
     st.title("📈 SPC 관리도 (X-bar 평균 차트)")
@@ -771,6 +667,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
