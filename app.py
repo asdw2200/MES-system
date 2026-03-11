@@ -453,7 +453,7 @@ elif menu == "📋 검사 현황(성적서)":
 
 elif menu == "📈 SPC 관리도":
     st.title("📈 실시간 SPC 관리도 (X-bar 추이)")
-    st.info("💡 부품과 검사항목을 선택하면, 합격 기준(Spec)과 함께 측정값의 변화 추이를 확인합니다.")
+    st.info("💡 부품과 검사항목을 선택하면, 합격 기준(Spec)과 함께 측정값의 변화 추이를 확인합니다. (※ 초물 검사 데이터만 분석합니다)")
 
     # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
@@ -503,9 +503,10 @@ elif menu == "📈 SPC 관리도":
                         
                         if selected_item != "선택 안함":
                             st.markdown("---")
-                            st.subheader(f"📊 {selected_part} - {selected_item} 관리도")
+                            st.subheader(f"📊 {selected_part} - {selected_item} 관리도 (초물 전용)")
                             
-                            part_log = df_log[df_log['품명'] == selected_part].copy()
+                            # 🌟 핵심: '품명'이 같고, 동시에 '검사구분'이 '초물'인 데이터만 강제로 뽑아옵니다!
+                            part_log = df_log[(df_log['품명'] == selected_part) & (df_log['검사구분'] == '초물')].copy()
                             plot_data = []
                             
                             for _, row in part_log.iterrows():
@@ -530,7 +531,6 @@ elif menu == "📈 SPC 관리도":
                                 df_plot['검사일시'] = pd.to_datetime(df_plot['검사일시'])
                                 df_plot = df_plot.sort_values('검사일시')
                                 
-                                # 🌟 핵심: 시간 단위는 버리고 'YY.MM.DD' (예: 26.03.11) 형식으로 강제 변환합니다!
                                 df_plot['검사일시'] = df_plot['검사일시'].dt.strftime('%y.%m.%d')
                                 
                                 df_plot['상한선(USL)'] = spec_dict[selected_item]['USL']
@@ -541,14 +541,14 @@ elif menu == "📈 SPC 관리도":
                                 st.line_chart(df_plot[['상한선(USL)', '측정값(평균)', '하한선(LSL)']])
                                 
                                 st.markdown("---")
-                                st.markdown(f"**📝 데이터 요약 (총 {len(df_plot)}회 검사 진행)**")
+                                st.markdown(f"**📝 데이터 요약 (총 {len(df_plot)}회 초물 검사 진행)**")
                                 c1, c2, c3 = st.columns(3)
                                 c1.metric("최대 측정값 (Max)", f"{df_plot['측정값(평균)'].max():.2f}")
                                 c2.metric("전체 평균값 (X-bar)", f"{df_plot['측정값(평균)'].mean():.2f}")
                                 c3.metric("최소 측정값 (Min)", f"{df_plot['측정값(평균)'].min():.2f}")
                                 
                             else:
-                                st.info("선택한 항목에 대한 측정 데이터가 없습니다.")
+                                st.info("선택한 항목에 대한 '초물' 측정 데이터가 없습니다.")
             else:
                 st.info("아직 분석할 데이터가 충분하지 않습니다. 현장 검사를 진행해 주세요.")
                 
@@ -925,6 +925,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
