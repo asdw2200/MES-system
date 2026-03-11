@@ -243,17 +243,75 @@ with st.sidebar:
 # (이 바로 아래에 원래 있던 if menu == "📊 대시보드": 가 오면 완벽합니다!)
 # --- 화면 출력부 시작 ---
 if menu == "📊 대시보드":
-    st.title("📊 실시간 품질 현황")
-    if not df.empty:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("총 검사 건수", f"{len(df)}건")
-        c2.metric("초물 완료", f"{len(df[df.apply(lambda r: r.astype(str).str.contains('초물').any(), axis=1)])}건")
-        c3.metric("종물 완료", f"{len(df[df.apply(lambda r: r.astype(str).str.contains('종물').any(), axis=1)])}건")
-        st.markdown("---")
-        st.subheader("📦 품목별 검사 비중")
-        st.bar_chart(df['품번'].value_counts())
-    else:
-        st.info("아직 입력된 데이터가 없습니다.")
+    st.title("📊 실시간 품질 대시보드")
+    st.info("💡 현장 검사 현황을 한눈에 파악할 수 있습니다.")
+
+    # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
+    
+    try:
+        # --- 출입증 코드 ---
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
+        client = gspread.authorize(creds)
+        doc = client.open_by_url(sheet_url)
+        
+        try:
+            # 🌟 새 창고(현장검사기록)에서 데이터를 가져옵니다!
+            ws_log = doc.worksheet("현장검사기록")
+            data = ws_log.get_all_values()
+            
+            if len(data) > 1:
+                df_log = pd.DataFrame(data[1:], columns=data[0])
+                
+                # 날짜 계산을 위해 문자열을 시간 데이터로 변환
+                df_log['검사일시'] = pd.to_datetime(df_log['검사일시'])
+                
+                # ==========================================
+                # 🌟 1. 핵심 요약 지표 (Metrics)
+                # ==========================================
+                total_count = len(df_log)
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                today_count = len(df_log[df_log['검사일시'].dt.strftime("%Y-%m-%d") == today_str])
+                inspector_count = df_log['검사자'].nunique()
+                
+                c1, c2, c3 = st.columns(3)
+                c1.metric("📦 누적 검사 건수", f"{total_count}건")
+                c2.metric("🆕 오늘 검사 건수", f"{today_count}건")
+                c3.metric("👨‍🔧 참여 검사자 수", f"{inspector_count}명")
+                
+                st.markdown("---")
+                
+                # ==========================================
+                # 🌟 2. 차트: 품목별 검사 건수
+                # ==========================================
+                st.subheader("📈 품목별 검사 현황")
+                part_counts = df_log['품명'].value_counts().reset_index()
+                part_counts.columns = ['품명', '검사건수']
+                
+                # Streamlit의 기본 막대그래프로 예쁘게 띄우기
+                st.bar_chart(part_counts.set_index('품명'))
+                
+                st.markdown("---")
+                
+                # ==========================================
+                # 🌟 3. 최근 검사 내역 (최신 5건만 심플하게)
+                # ==========================================
+                st.subheader("🕒 최근 검사 기록 (최신 5건)")
+                recent_df = df_log.sort_values(by="검사일시", ascending=False).head(5)
+                
+                # 텍스트가 너무 길면 보기 싫으니 측정결과는 숨기기
+                display_df = recent_df[["검사일시", "검사구분", "품번", "품명", "검사자"]]
+                st.dataframe(display_df, hide_index=True, use_container_width=True)
+
+            else:
+                st.info("아직 입력된 데이터가 없습니다. [📋 현장 검사 등록]에서 첫 데이터를 입력해 주세요!")
+                
+        except Exception as e:
+            st.warning("아직 '현장검사기록' 탭이 생성되지 않았습니다. 데이터를 한 번 등록해 주세요.")
+
+    except Exception as e:
+        st.error(f"오류가 발생했습니다: {e}")
 
 
 elif menu == "📋 검사 현황(성적서)":
@@ -804,6 +862,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
