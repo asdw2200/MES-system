@@ -219,7 +219,7 @@ with st.sidebar:
     
     menu = option_menu(
         menu_title=None, 
-        options=["📊 대시보드", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고", "🛠️ 검교정 현황"],
+        options=["📊 대시보드", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고", "🛠️ 검교정 현황", "⚙️ 기준정보 관리"],
         default_index=0,
         styles={
             "container": {"padding": "5!important", "background-color": "transparent"},
@@ -636,6 +636,50 @@ elif menu == "📥 수입자재 검사대기":
 
     else:
         st.success("✨ 현재 대기 중이거나 등록된 수입자재 내역이 없습니다.")
+
+elif menu == "⚙️ 기준정보 관리":
+    st.title("⚙️ 부품별 기준정보(Spec) 관리")
+    st.info("💡 아래 표를 엑셀처럼 직접 수정하거나 새 행을 추가한 뒤, [💾 구글 시트에 저장] 버튼을 누르세요.")
+
+    # 🚨 관리자님의 진짜 구글 시트 주소로 꼭 변경해 주세요!
+    sheet_url = "https://docs.google.com/spreadsheets/d/https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159/edit" 
+    
+    try:
+        doc = client.open_by_url(sheet_url)
+        try:
+            ws = doc.worksheet("기준정보")
+        except:
+            st.error("구글 시트에 '기준정보' 탭을 찾을 수 없습니다. 이름을 확인해 주세요!")
+            st.stop()
+            
+        # 1. 구글 시트에서 기존 데이터 싹 가져오기
+        data = ws.get_all_values()
+        if len(data) > 1:
+            df_master = pd.DataFrame(data[1:], columns=data[0])
+        else:
+            # 데이터가 아예 없으면 빈 표 만들기
+            df_master = pd.DataFrame(columns=["품번", "검사항목", "시료수", "최소값", "최대값"])
+        
+        # 2. 🌟 마법의 기능: 웹 화면에서 엑셀처럼 표를 직접 수정/추가할 수 있게 띄워줌!
+        # (맨 밑에 빈칸이 생겨서 행을 무한대로 추가할 수 있습니다)
+        edited_df = st.data_editor(df_master, num_rows="dynamic", use_container_width=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 3. 저장 버튼
+        if st.button("💾 수정한 기준정보 구글 시트에 완벽 저장하기", type="primary", use_container_width=True):
+            with st.spinner("구글 시트에 저장 중입니다..."):
+                # 시트를 싹 비우고 화면에 있는 예쁜 표로 덮어쓰기!
+                ws.clear()
+                updated_data = [edited_df.columns.values.tolist()] + edited_df.values.tolist()
+                ws.update("A1", updated_data)
+                
+                st.success("✅ 기준정보가 성공적으로 업데이트되었습니다!")
+                st.cache_data.clear() # 캐시 초기화
+                
+    except Exception as e:
+        st.error(f"오류가 발생했습니다. 구글 시트 주소를 확인해 주세요: {e}")
+
 
 
 
