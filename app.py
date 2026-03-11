@@ -642,7 +642,7 @@ elif menu == "⚙️ 기준정보 관리":
     st.info("💡 아래 표를 엑셀처럼 직접 수정하거나 새 행을 추가한 뒤, [💾 구글 시트에 저장] 버튼을 누르세요.")
 
     # 🚨 관리자님의 진짜 구글 시트 주소로 꼭 변경해 주세요!
-    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=132014435#gid=132014435" 
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     
     try:
         doc = client.open_by_url(sheet_url)
@@ -679,6 +679,7 @@ elif menu == "⚙️ 기준정보 관리":
                 
     except Exception as e:
         st.error(f"오류가 발생했습니다. 구글 시트 주소를 확인해 주세요: {e}")
+
 
 
 
