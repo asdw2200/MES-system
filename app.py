@@ -608,7 +608,6 @@ elif menu == "⚙️ 기준정보 관리":
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     
     try:
-        # --- 출입증 코드 ---
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
         client = gspread.authorize(creds)
@@ -620,25 +619,20 @@ elif menu == "⚙️ 기준정보 관리":
         if len(data) > 1:
             df_master = pd.DataFrame(data[1:], columns=data[0])
         else:
-            # 차종이 맨 앞에 추가된 새로운 양식!
             df_master = pd.DataFrame(columns=["차종", "품번", "품명", "검사항목", "시료수", "최소값", "최대값"])
             
         # ==========================================
-        # 🌟 1. 스마트 간편 등록기 (노가다 방지용!)
+        # 🌟 1. 스마트 간편 등록기 (신규 부품 등록용)
         # ==========================================
-        st.markdown("### 🚀 신규 부품 간편 등록기")
-        st.info("💡 차종, 품번, 품명을 딱 한 번만 입력하고, 아래 항목만 적으세요. 파이썬이 알아서 합쳐서 저장합니다!")
+        st.markdown("### 🚀 신규 부품 간편 등록")
+        st.info("💡 차종, 품번, 품명을 딱 한 번만 입력하고, 아래 항목만 적으세요.")
         
-        with st.container():
-            # 기본 정보 3가지는 위에서 한 번만 받음
+        with st.expander("➕ 여기를 눌러 새로운 부품을 등록하세요", expanded=False):
             c1, c2, c3 = st.columns(3)
             new_car = c1.text_input("🚗 차종 (예: AX PE)")
             new_part_num = c2.text_input("🔢 품번 (예: 97390-GX900)")
             new_part_name = c3.text_input("📦 품명 (예: HOSE-SD DEFROSTER RH)")
             
-            st.markdown("**📝 검사 항목 입력 (센스있게 기본 항목은 미리 적어뒀습니다!)**")
-            
-            # 관리자님이 매번 치기 귀찮으실까봐 중량, 두께, 외관을 미리 세팅해 뒀습니다!
             empty_items = pd.DataFrame([
                 {"검사항목": "중량", "시료수": 3, "최소값": "", "최대값": ""},
                 {"검사항목": "두께", "시료수": 3, "최소값": "", "최대값": ""},
@@ -647,50 +641,83 @@ elif menu == "⚙️ 기준정보 관리":
                 {"검사항목": "", "시료수": 3, "최소값": "", "최대값": ""}
             ])
             
-            # 항목만 입력하는 미니 엑셀 표
             edited_new_items = st.data_editor(empty_items, num_rows="dynamic", hide_index=True, use_container_width=True)
             
-            if st.button("➕ 위 내용으로 새 부품 등록하기", type="primary", use_container_width=True):
+            if st.button("💾 위 내용으로 새 부품 등록하기", type="primary", use_container_width=True):
                 if not new_car or not new_part_num or not new_part_name:
                     st.error("⚠️ 차종, 품번, 품명을 모두 입력해 주세요!")
                 else:
-                    # 항목 이름이 빈칸이 아닌 것만 골라냄
                     valid_items = edited_new_items[edited_new_items["검사항목"].str.strip() != ""]
                     if valid_items.empty:
                         st.error("⚠️ 최소 1개 이상의 검사항목을 입력해 주세요!")
                     else:
-                        with st.spinner("구글 시트에 똑똑하게 저장 중입니다..."):
-                            # 파이썬이 관리자님 대신 '차종, 품번, 품명'을 복사해서 표를 만들어 줍니다.
+                        with st.spinner("저장 중..."):
                             new_rows = []
                             for _, row in valid_items.iterrows():
                                 new_rows.append([new_car, new_part_num, new_part_name, row["검사항목"], row["시료수"], row["최소값"], row["최대값"]])
-                                
-                            # 구글 시트 맨 아래에 데이터 추가
                             for row in new_rows:
                                 ws.append_row(row)
-                                
                             st.success(f"✅ {new_part_name} 부품 기준정보 등록 완료!")
                             st.cache_data.clear()
-                            st.rerun() # 화면 새로고침
+                            st.rerun() 
                             
         st.markdown("---")
         
         # ==========================================
-        # 🌟 2. 전체 데이터 조회 및 수정 (기존 기능)
+        # 🌟 2. 기존 부품 스펙 조회 및 심플 수정! (복잡함 해결!)
         # ==========================================
-        st.markdown("### 📋 전체 기준정보 조회 및 수정")
-        st.caption("기존에 등록된 전체 데이터를 엑셀처럼 쓱쓱 수정하고 저장할 수 있습니다.")
+        st.markdown("### 📋 등록된 부품 스펙 수정")
         
-        edited_df = st.data_editor(df_master, num_rows="dynamic", use_container_width=True)
-        
-        if st.button("💾 수정한 전체 표 구글 시트에 덮어쓰기", use_container_width=True):
-            with st.spinner("구글 시트 전체 업데이트 중..."):
-                ws.clear()
-                updated_data = [edited_df.columns.values.tolist()] + edited_df.values.tolist()
-                ws.update("A1", updated_data)
+        if not df_master.empty:
+            # 1. 보기 편하게 '차종 | 품번 | 품명' 으로 묶어서 리스트 만들기
+            df_master["부품식별"] = df_master["차종"] + " | " + df_master["품번"] + " | " + df_master["품명"]
+            part_list = df_master["부품식별"].unique().tolist()
+            
+            # 2. 수정할 부품을 드롭다운으로 선택!
+            selected_target = st.selectbox("🛠️ 수정할 부품을 선택하세요", ["선택 안함"] + part_list)
+            
+            if selected_target != "선택 안함":
+                # 선택한 부품의 데이터만 쏙 뽑아옵니다.
+                target_df = df_master[df_master["부품식별"] == selected_target].copy()
                 
-                st.success("✅ 전체 기준정보가 성공적으로 업데이트되었습니다!")
-                st.cache_data.clear() 
+                st.markdown(f"**🔍 [{selected_target}] 검사 항목 수정**")
+                st.caption("항목을 수정하거나 행을 추가/삭제한 뒤 저장 버튼을 누르세요. (불필요한 차종/품번 칸은 숨겼습니다!)")
+                
+                # 3. 차종, 품번, 품명 등 중복되는 지저분한 칸은 빼고 심플하게 보여줌!
+                edit_df = target_df[["검사항목", "시료수", "최소값", "최대값"]]
+                
+                # 엑셀처럼 띄우기
+                edited_spec = st.data_editor(edit_df, num_rows="dynamic", hide_index=True, use_container_width=True)
+                
+                if st.button("🔄 이 부품의 스펙만 업데이트하기", use_container_width=True):
+                    with st.spinner("구글 시트에 업데이트 중입니다..."):
+                        # 빈 칸(항목 이름 없는 줄)은 자동으로 제거
+                        valid_edited = edited_spec[edited_spec["검사항목"].str.strip() != ""]
+                        
+                        # 1) 전체 데이터에서 방금 선택했던 부품의 기존 데이터만 싹 지움
+                        df_master_new = df_master[df_master["부품식별"] != selected_target].copy()
+                        
+                        # 2) 수정한 심플 표에 다시 차종, 품번, 품명을 붙여줌 (저장용)
+                        car, p_num, p_name = selected_target.split(" | ")
+                        valid_edited.insert(0, "품명", p_name)
+                        valid_edited.insert(0, "품번", p_num)
+                        valid_edited.insert(0, "차종", car)
+                        
+                        # 3) 기존 데이터 + 수정한 데이터 합치기
+                        final_df = pd.concat([df_master_new, valid_edited], ignore_index=True)
+                        if "부품식별" in final_df.columns:
+                            final_df = final_df.drop(columns=["부품식별"])
+                            
+                        # 4) 구글 시트에 통째로 덮어쓰기!
+                        ws.clear()
+                        updated_data = [final_df.columns.values.tolist()] + final_df.values.tolist()
+                        ws.update("A1", updated_data)
+                        
+                        st.success("✅ 스펙 수정이 완벽하게 반영되었습니다!")
+                        st.cache_data.clear() 
+                        st.rerun()
+        else:
+            st.info("아직 등록된 부품이 없습니다. 위에서 신규 부품을 등록해 주세요.")
                 
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
@@ -788,6 +815,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
