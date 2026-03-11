@@ -641,11 +641,19 @@ elif menu == "⚙️ 기준정보 관리":
     st.title("⚙️ 부품별 기준정보(Spec) 관리")
     st.info("💡 아래 표를 엑셀처럼 직접 수정하거나 새 행을 추가한 뒤, [💾 구글 시트에 저장] 버튼을 누르세요.")
 
-    # 🚨 관리자님의 진짜 구글 시트 주소로 꼭 변경해 주세요!
+    # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     
     try:
+        # --- 🌟 새로 추가된 마법의 출입증 코드 ---
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        # (💡만약 위쪽 코드에서 st.secrets 이름을 다르게 쓰셨다면 그 이름으로 맞춰주세요!)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
+        client = gspread.authorize(creds)
+        # ----------------------------------------
+        
         doc = client.open_by_url(sheet_url)
+        
         try:
             ws = doc.worksheet("기준정보")
         except:
@@ -660,8 +668,7 @@ elif menu == "⚙️ 기준정보 관리":
             # 데이터가 아예 없으면 빈 표 만들기
             df_master = pd.DataFrame(columns=["품번", "검사항목", "시료수", "최소값", "최대값"])
         
-        # 2. 🌟 마법의 기능: 웹 화면에서 엑셀처럼 표를 직접 수정/추가할 수 있게 띄워줌!
-        # (맨 밑에 빈칸이 생겨서 행을 무한대로 추가할 수 있습니다)
+        # 2. 화면에 엑셀처럼 표 띄워주기
         edited_df = st.data_editor(df_master, num_rows="dynamic", use_container_width=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
@@ -669,16 +676,16 @@ elif menu == "⚙️ 기준정보 관리":
         # 3. 저장 버튼
         if st.button("💾 수정한 기준정보 구글 시트에 완벽 저장하기", type="primary", use_container_width=True):
             with st.spinner("구글 시트에 저장 중입니다..."):
-                # 시트를 싹 비우고 화면에 있는 예쁜 표로 덮어쓰기!
                 ws.clear()
                 updated_data = [edited_df.columns.values.tolist()] + edited_df.values.tolist()
                 ws.update("A1", updated_data)
                 
                 st.success("✅ 기준정보가 성공적으로 업데이트되었습니다!")
-                st.cache_data.clear() # 캐시 초기화
+                st.cache_data.clear() 
                 
     except Exception as e:
-        st.error(f"오류가 발생했습니다. 구글 시트 주소를 확인해 주세요: {e}")
+        st.error(f"오류가 발생했습니다. 출입증 키 이름이나 주소를 확인해 주세요: {e}")
+
 
 
 
