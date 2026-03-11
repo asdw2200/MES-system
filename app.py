@@ -341,7 +341,7 @@ elif menu == "📋 검사 현황(성적서)":
                                     item_name, item_val = res.split(": ", 1)
                                     
                                     is_ng = False
-                                    spec_str = "" # 🌟 스펙을 담을 변수 추가!
+                                    spec_str = "" 
                                     
                                     spec = df_master[(df_master["품명"] == row["품명"]) & (df_master["검사항목"] == item_name)]
                                     
@@ -349,15 +349,18 @@ elif menu == "📋 검사 현황(성적서)":
                                         min_v = spec.iloc[0]["최소값"]
                                         max_v = spec.iloc[0]["최대값"]
                                         try:
-                                            # 숫자인 경우에만 (Spec: ~ ) 글자를 만듭니다.
+                                            # 1. 숫자 스펙인 경우
                                             float(min_v)
                                             spec_str = f" (Spec: {min_v}~{max_v})"
                                             
                                             if not (float(min_v) <= float(item_val) <= float(max_v)):
                                                 is_ng = True
-                                        except: pass
-                                            
-                                    # 🌟 NG일 때는 빨간불+스펙, 정상일 때는 숫자+스펙
+                                        except: 
+                                            # 🌟 2. 텍스트 스펙인 경우 (BURR 없을 것, OK 등)
+                                            spec_str = f" (기준: {min_v})"
+                                            if item_val == "NG": # 작업자가 NG를 골랐으면 빨간불 켜기
+                                                is_ng = True
+                                                
                                     display_val = f"🔴 {item_val}{spec_str}" if is_ng else f"{item_val}{spec_str}"
                                     cols[i].metric(label=item_name, value=display_val)
                                 else:
@@ -378,6 +381,8 @@ elif menu == "📋 검사 현황(성적서)":
 
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
+
 # --- [3] 📈 SPC 관리도 (평균값 적용 및 고급 차트 업그레이드) ---
 elif menu == "📈 SPC 관리도":
     st.title("📈 SPC 관리도 (X-bar 평균 차트)")
@@ -742,6 +747,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
