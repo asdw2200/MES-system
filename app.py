@@ -681,42 +681,47 @@ elif menu == "📋 현장 검사 등록":
                 
                 with st.form("inspection_form"):
                     c1, c2 = st.columns(2)
-                    inspector = c1.text_input("👨‍🔧 검사자 이름 (예: 홍길동)")
+                    
+                    # 🌟 1. 검사자 이름을 드롭다운으로 변경! (여기에 실제 작업자분들 이름을 적어주세요)
+                    inspector_list = ["함인철", "김윤곤"] 
+                    inspector = c1.selectbox("👨‍🔧 검사자 이름", inspector_list)
+                    
                     insp_type = c2.selectbox("🏷️ 검사 구분", ["초물", "중물", "종물"])
                     
                     st.markdown("##### 📝 측정 항목 입력")
                     results = {}
                     
-                    # 🌟 마법 추가: 시료수만큼 입력칸을 자동으로 복사해줌!
                     for index, row in spec_df.iterrows():
                         item = row["검사항목"]
                         min_v = row["최소값"]
                         max_v = row["최대값"]
                         
                         try: sample_cnt = int(row["시료수"])
-                        except: sample_cnt = 1 # 비어있으면 1개로 침
+                        except: sample_cnt = 1 
                         
                         st.markdown(f"**📌 {item} (기준: {min_v}~{max_v} / 시료 {sample_cnt}개)**")
-                        cols = st.columns(sample_cnt) # 시료수만큼 가로로 화면 쪼개기
+                        cols = st.columns(sample_cnt) 
                         
                         is_numeric = True
                         try: float(min_v)
                         except: is_numeric = False
                             
                         for i in range(sample_cnt):
-                            item_key = f"{item}-{i+1}" # 중량-1, 중량-2 로 이름 짓기
+                            item_key = f"{item}-{i+1}" 
                             with cols[i]:
+                                # 🌟 2. '1회차' 대신 'N=1'로 이름 변경!
                                 if not is_numeric:
-                                    results[item_key] = st.selectbox(f"{i+1}회차", ["OK", "NG"], key=item_key)
+                                    results[item_key] = st.selectbox(f"N={i+1}", ["OK", "NG"], key=item_key)
                                 else:
-                                    results[item_key] = st.text_input(f"{i+1}회차", placeholder="측정값", key=item_key)
+                                    results[item_key] = st.text_input(f"N={i+1}", placeholder="측정값", key=item_key)
                         st.markdown("<br>", unsafe_allow_html=True)
                             
                     submit_btn = st.form_submit_button("💾 검사 결과 저장", type="primary", use_container_width=True)
                     
                     if submit_btn:
-                        if not inspector:
-                            st.error("⚠️ 검사자 이름을 입력해 주세요!")
+                        # 검사자를 선택하지 않고 넘어가려 할 때 경고!
+                        if inspector == "선택 안함":
+                            st.error("⚠️ 검사자 이름을 선택해 주세요!")
                         else:
                             with st.spinner("구글 시트에 안전하게 저장 중입니다..."):
                                 result_str = " / ".join([f"{k}: {v}" for k, v in results.items() if v != ""])
