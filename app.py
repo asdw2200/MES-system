@@ -260,11 +260,10 @@ elif menu == "📋 검사 현황(성적서)":
     st.title("📋 현장 검사 기록 현황")
     st.info("💡 표 왼쪽의 '선택' 칸을 체크하면 아래에 상세 수치 데이터가 표시됩니다.")
 
-    # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
+    # 🚨 여기에 진짜 구글 시트 주소 넣기!
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     
     try:
-        # --- 출입증 코드 ---
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
         client = gspread.authorize(creds)
@@ -289,7 +288,9 @@ elif menu == "📋 검사 현황(성적서)":
                     for item in items:
                         if ": " in item:
                             k, v = item.split(": ", 1)
-                            spec = df_master[(df_master["품명"] == part_name) & (df_master["검사항목"] == k)]
+                            # 🌟 핵심: '중량-1' 이라는 글자에서 '-1'을 떼고 '중량'으로 스펙을 검색합니다!
+                            base_k = k.split("-")[0] 
+                            spec = df_master[(df_master["품명"] == part_name) & (df_master["검사항목"] == base_k)]
                             if not spec.empty:
                                 min_v = spec.iloc[0]["최소값"]
                                 max_v = spec.iloc[0]["최대값"]
@@ -299,7 +300,8 @@ elif menu == "📋 검사 현황(성적서)":
                                     else:
                                         judgments.append(f"{k}: 🔴NG")
                                 except:
-                                    judgments.append(f"{k}: {v}") 
+                                    if v == "NG": judgments.append(f"{k}: 🔴NG")
+                                    else: judgments.append(f"{k}: OK")
                             else:
                                 judgments.append(f"{k}: {v}")
                         else:
@@ -312,14 +314,8 @@ elif menu == "📋 검사 현황(성적서)":
                 st.success(f"✅ 총 {len(df_log)}건의 검사 기록이 안전하게 보관되어 있습니다.")
                 
                 edited_df = st.data_editor(
-                    df_log,
-                    hide_index=True,
-                    use_container_width=True,
-                    column_config={
-                        "선택": st.column_config.CheckboxColumn("선택", default=False, width="small"),
-                        "측정결과": None, 
-                        "요약결과": st.column_config.TextColumn("측정결과(판정)") 
-                    }
+                    df_log, hide_index=True, use_container_width=True,
+                    column_config={"선택": st.column_config.CheckboxColumn("선택", default=False, width="small"), "측정결과": None, "요약결과": st.column_config.TextColumn("측정결과(판정)")}
                 )
                 
                 selected_rows = edited_df[edited_df["선택"] == True]
@@ -334,54 +330,46 @@ elif menu == "📋 검사 현황(성적서)":
                             st.caption(f"👨‍🔧 검사자: {row['검사자']} | 🕒 일시: {row['검사일시']}")
                             
                             results_list = row['측정결과'].split(" / ")
-                            cols = st.columns(len(results_list))
                             
-                            for i, res in enumerate(results_list):
-                                if ": " in res:
-                                    item_name, item_val = res.split(": ", 1)
-                                    
-                                    is_ng = False
-                                    spec_str = "" 
-                                    
-                                    spec = df_master[(df_master["품명"] == row["품명"]) & (df_master["검사항목"] == item_name)]
-                                    
-                                    if not spec.empty:
-                                        min_v = spec.iloc[0]["최소값"]
-                                        max_v = spec.iloc[0]["최대값"]
-                                        try:
-                                            # 1. 숫자 스펙인 경우
-                                            float(min_v)
-                                            spec_str = f" (Spec: {min_v}~{max_v})"
-                                            
-                                            if not (float(min_v) <= float(item_val) <= float(max_v)):
-                                                is_ng = True
-                                        except: 
-                                            # 🌟 2. 텍스트 스펙인 경우 (BURR 없을 것, OK 등)
-                                            spec_str = f" (기준: {min_v})"
-                                            if item_val == "NG": # 작업자가 NG를 골랐으면 빨간불 켜기
-                                                is_ng = True
-                                                
-                                    display_val = f"🔴 {item_val}{spec_str}" if is_ng else f"{item_val}{spec_str}"
-                                    cols[i].metric(label=item_name, value=display_val)
-                                else:
-                                    cols[i].write(res)
-                            
+                            # 🌟 시료가 많아지면 옆으로 너무 길어지므로 4개 단위로 줄바꿈!
+                            num_cols = 4
+                            for i in range(0, len(results_list), num_cols):
+                                cols = st.columns(num_cols)
+                                for j, res in enumerate(results_list[i:i+num_cols]):
+                                    if ": " in res:
+                                        item_name, item_val = res.split(": ", 1)
+                                        base_item_name = item_name.split("-")[0]
+                                        
+                                        is_ng = False
+                                        spec_str = "" 
+                                        spec = df_master[(df_master["품명"] == row["품명"]) & (df_master["검사항목"] == base_item_name)]
+                                        
+                                        if not spec.empty:
+                                            min_v = spec.iloc[0]["최소값"]
+                                            max_v = spec.iloc[0]["최대값"]
+                                            try:
+                                                float(min_v)
+                                                spec_str = f" (Spec: {min_v}~{max_v})"
+                                                if not (float(min_v) <= float(item_val) <= float(max_v)): is_ng = True
+                                            except: 
+                                                spec_str = f" (기준: {min_v})"
+                                                if item_val == "NG": is_ng = True
+                                                    
+                                        display_val = f"🔴 {item_val}{spec_str}" if is_ng else f"{item_val}{spec_str}"
+                                        cols[j].metric(label=item_name, value=display_val)
+                                    else:
+                                        cols[j].write(res)
                             st.markdown("---") 
-                
                 else:
                     st.markdown("---")
                     st.subheader("🖨️ 성적서 PDF 출력")
                     st.warning("💡 PDF 출력 기능은 '한글 폰트 깨짐 방지' 세팅 중입니다.")
-
             else:
                 st.info("아직 저장된 검사 기록이 없습니다.")
-                
         except Exception as e:
             st.warning("아직 '현장검사기록' 탭이 없습니다.")
-
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
-
 
 # --- [3] 📈 SPC 관리도 (평균값 적용 및 고급 차트 업그레이드) ---
 elif menu == "📈 SPC 관리도":
@@ -666,37 +654,31 @@ elif menu == "📋 현장 검사 등록":
     st.title("📋 현장 검사(초/중/종물) 등록")
     st.info("💡 품명을 선택하면 등록된 스펙(기준값)이 자동으로 나타납니다.")
 
-    # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
+    # 🚨 여기에 진짜 구글 시트 주소 넣기!
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     
     try:
-        # --- 출입증 코드 ---
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
         creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
         client = gspread.authorize(creds)
         doc = client.open_by_url(sheet_url)
         
-        # 1. 기준정보 가져오기
         ws_master = doc.worksheet("기준정보")
         data = ws_master.get_all_values()
         
         if len(data) > 1:
             df_master = pd.DataFrame(data[1:], columns=data[0])
-            # 품명 리스트 만들기
             part_names = df_master["품명"].dropna().unique().tolist()
             
             selected_part = st.selectbox("📦 검사할 품명을 선택하세요", ["선택 안함"] + part_names)
             
             if selected_part != "선택 안함":
                 st.markdown("---")
-                
-                # 선택한 품번/품명 스펙 가져오기
                 spec_df = df_master[df_master["품명"] == selected_part]
-                part_num = spec_df.iloc[0]["품번"] # 해당 품번 가져오기
+                part_num = spec_df.iloc[0]["품번"] 
                 
                 st.subheader(f"🔍 [{part_num}] {selected_part} 검사 입력")
                 
-                # --- 폼(Form) 시작: 한 번에 묶어서 저장 ---
                 with st.form("inspection_form"):
                     c1, c2 = st.columns(2)
                     inspector = c1.text_input("👨‍🔧 검사자 이름 (예: 홍길동)")
@@ -705,19 +687,31 @@ elif menu == "📋 현장 검사 등록":
                     st.markdown("##### 📝 측정 항목 입력")
                     results = {}
                     
-                    # 🌟 마법의 기능: 기준정보에 등록된 항목만큼 입력칸이 자동으로 생김!
+                    # 🌟 마법 추가: 시료수만큼 입력칸을 자동으로 복사해줌!
                     for index, row in spec_df.iterrows():
                         item = row["검사항목"]
                         min_v = row["최소값"]
                         max_v = row["최대값"]
                         
-                        # 합격/불합격(텍스트)인지 숫자인지 대략 구분해서 입력칸 다르게 보여주기
-                        if str(min_v).upper() in ["OK", "합격", "양호", "무", "유"]:
-                            results[item] = st.selectbox(f"👀 {item} (기준: {min_v})", ["OK", "NG"])
-                        else:
-                            results[item] = st.text_input(f"📏 {item} (기준: {min_v} ~ {max_v})", placeholder="측정값을 입력하세요")
+                        try: sample_cnt = int(row["시료수"])
+                        except: sample_cnt = 1 # 비어있으면 1개로 침
+                        
+                        st.markdown(f"**📌 {item} (기준: {min_v}~{max_v} / 시료 {sample_cnt}개)**")
+                        cols = st.columns(sample_cnt) # 시료수만큼 가로로 화면 쪼개기
+                        
+                        is_numeric = True
+                        try: float(min_v)
+                        except: is_numeric = False
                             
-                    # 저장 버튼
+                        for i in range(sample_cnt):
+                            item_key = f"{item}-{i+1}" # 중량-1, 중량-2 로 이름 짓기
+                            with cols[i]:
+                                if not is_numeric:
+                                    results[item_key] = st.selectbox(f"{i+1}회차", ["OK", "NG"], key=item_key)
+                                else:
+                                    results[item_key] = st.text_input(f"{i+1}회차", placeholder="측정값", key=item_key)
+                        st.markdown("<br>", unsafe_allow_html=True)
+                            
                     submit_btn = st.form_submit_button("💾 검사 결과 저장", type="primary", use_container_width=True)
                     
                     if submit_btn:
@@ -725,12 +719,9 @@ elif menu == "📋 현장 검사 등록":
                             st.error("⚠️ 검사자 이름을 입력해 주세요!")
                         else:
                             with st.spinner("구글 시트에 안전하게 저장 중입니다..."):
-                                # 결과를 하나의 깔끔한 문장으로 묶기 (예: 중량: 33.5 / 외관: OK)
-                                result_str = " / ".join([f"{k}: {v}" for k, v in results.items()])
+                                result_str = " / ".join([f"{k}: {v}" for k, v in results.items() if v != ""])
                                 
-                                # 구글 시트에 '현장검사기록' 탭이 없으면 파이썬이 알아서 만듦!
-                                try:
-                                    ws_log = doc.worksheet("현장검사기록")
+                                try: ws_log = doc.worksheet("현장검사기록")
                                 except:
                                     ws_log = doc.add_worksheet(title="현장검사기록", rows="1000", cols="10")
                                     ws_log.append_row(["검사일시", "검사구분", "품번", "품명", "검사자", "측정결과"])
@@ -740,10 +731,10 @@ elif menu == "📋 현장 검사 등록":
                                 ws_log.append_row(new_row)
                                 
                                 st.success("✅ 검사 결과가 성공적으로 저장되었습니다!")
-                                st.balloons() # 축하 풍선 효과! 🎉
+                                st.balloons() 
                                 
         else:
-            st.warning("⚠️ 등록된 기준정보가 없습니다. [⚙️ 기준정보 관리]에서 먼저 부품을 등록해 주세요.")
+            st.warning("⚠️ 등록된 기준정보가 없습니다.")
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
