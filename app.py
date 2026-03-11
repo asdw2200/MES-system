@@ -261,7 +261,7 @@ elif menu == "📋 검사 현황(성적서)":
     st.info("💡 [현장 검사 등록] 메뉴에서 입력한 최신 데이터가 이곳에 차곡차곡 쌓입니다.")
 
     # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
-    sheet_url = "https://docs.google.com/spreadsheets/d/여기에_진짜_주소_넣기/edit" 
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     
     try:
         # --- 출입증 코드 ---
@@ -667,6 +667,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
