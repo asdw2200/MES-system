@@ -219,7 +219,7 @@ with st.sidebar:
     
     menu = option_menu(
         menu_title=None, 
-        options=["📊 대시보드", "📋 현장 검사 등록", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고", "🛠️ 검교정 현황", "⚙️ 기준정보 관리"],
+        options=["📊 대시보드", "📋 현장 검사 등록", "📋 검사 현황(성적서)", "📈 SPC 관리도","⚙️ 기준정보 관리"],
         default_index=0,
         styles={
             "container": {"padding": "5!important", "background-color": "transparent"},
@@ -928,6 +928,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
