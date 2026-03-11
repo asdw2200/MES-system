@@ -665,8 +665,8 @@ elif menu == "⚙️ 기준정보 관리":
         if len(data) > 1:
             df_master = pd.DataFrame(data[1:], columns=data[0])
         else:
-            # 데이터가 아예 없으면 빈 표 만들기
-            df_master = pd.DataFrame(columns=["품번", "검사항목", "시료수", "최소값", "최대값"])
+            # 🌟 '품명' 칸을 추가해서 빈 표 만들기!
+            df_master = pd.DataFrame(columns=["품번", "품명", "검사항목", "시료수", "최소값", "최대값"])
         
         # 2. 화면에 엑셀처럼 표 띄워주기
         edited_df = st.data_editor(df_master, num_rows="dynamic", use_container_width=True)
@@ -685,6 +685,7 @@ elif menu == "⚙️ 기준정보 관리":
                 
     except Exception as e:
         st.error(f"오류가 발생했습니다. 출입증 키 이름이나 주소를 확인해 주세요: {e}")
+
 
 
 
