@@ -622,7 +622,7 @@ elif menu == "⚙️ 기준정보 관리":
             df_master = pd.DataFrame(columns=["차종", "품번", "품명", "검사항목", "시료수", "최소값", "최대값"])
             
         # ==========================================
-        # 🌟 1. 스마트 간편 등록기 (신규 부품 등록용)
+        # 🌟 1. 스마트 간편 등록기
         # ==========================================
         st.markdown("### 🚀 신규 부품 간편 등록")
         st.info("💡 차종, 품번, 품명을 딱 한 번만 입력하고, 아래 항목만 적으세요.")
@@ -664,51 +664,48 @@ elif menu == "⚙️ 기준정보 관리":
         st.markdown("---")
         
         # ==========================================
-        # 🌟 2. 기존 부품 스펙 조회 및 심플 수정! (복잡함 해결!)
+        # 🌟 2. 기존 부품 스펙 조회 및 심플 수정 (검색 기능 추가!)
         # ==========================================
         st.markdown("### 📋 등록된 부품 스펙 수정")
         
         if not df_master.empty:
-            # 1. 보기 편하게 '차종 | 품번 | 품명' 으로 묶어서 리스트 만들기
             df_master["부품식별"] = df_master["차종"] + " | " + df_master["품번"] + " | " + df_master["품명"]
             part_list = df_master["부품식별"].unique().tolist()
             
-            # 2. 수정할 부품을 드롭다운으로 선택!
-            selected_target = st.selectbox("🛠️ 수정할 부품을 선택하세요", ["선택 안함"] + part_list)
+            # 🌟 검색창 추가!
+            search_keyword = st.text_input("🔍 품번 또는 품명 검색 (검색어를 입력하면 아래 목록이 줄어듭니다)", placeholder="예: GX900 또는 HOSE")
+            
+            # 검색어가 있으면 필터링, 없으면 전체 목록
+            if search_keyword:
+                filtered_list = [p for p in part_list if search_keyword.lower() in p.lower() or search_keyword.replace(" ", "") in p.replace(" ", "")]
+            else:
+                filtered_list = part_list
+            
+            # 필터링된 목록을 드롭다운에 띄우기
+            selected_target = st.selectbox("🛠️ 수정할 부품을 선택하세요", ["선택 안함"] + filtered_list)
             
             if selected_target != "선택 안함":
-                # 선택한 부품의 데이터만 쏙 뽑아옵니다.
                 target_df = df_master[df_master["부품식별"] == selected_target].copy()
                 
                 st.markdown(f"**🔍 [{selected_target}] 검사 항목 수정**")
-                st.caption("항목을 수정하거나 행을 추가/삭제한 뒤 저장 버튼을 누르세요. (불필요한 차종/품번 칸은 숨겼습니다!)")
-                
-                # 3. 차종, 품번, 품명 등 중복되는 지저분한 칸은 빼고 심플하게 보여줌!
                 edit_df = target_df[["검사항목", "시료수", "최소값", "최대값"]]
                 
-                # 엑셀처럼 띄우기
                 edited_spec = st.data_editor(edit_df, num_rows="dynamic", hide_index=True, use_container_width=True)
                 
                 if st.button("🔄 이 부품의 스펙만 업데이트하기", use_container_width=True):
                     with st.spinner("구글 시트에 업데이트 중입니다..."):
-                        # 빈 칸(항목 이름 없는 줄)은 자동으로 제거
                         valid_edited = edited_spec[edited_spec["검사항목"].str.strip() != ""]
-                        
-                        # 1) 전체 데이터에서 방금 선택했던 부품의 기존 데이터만 싹 지움
                         df_master_new = df_master[df_master["부품식별"] != selected_target].copy()
                         
-                        # 2) 수정한 심플 표에 다시 차종, 품번, 품명을 붙여줌 (저장용)
                         car, p_num, p_name = selected_target.split(" | ")
                         valid_edited.insert(0, "품명", p_name)
                         valid_edited.insert(0, "품번", p_num)
                         valid_edited.insert(0, "차종", car)
                         
-                        # 3) 기존 데이터 + 수정한 데이터 합치기
                         final_df = pd.concat([df_master_new, valid_edited], ignore_index=True)
                         if "부품식별" in final_df.columns:
                             final_df = final_df.drop(columns=["부품식별"])
                             
-                        # 4) 구글 시트에 통째로 덮어쓰기!
                         ws.clear()
                         updated_data = [final_df.columns.values.tolist()] + final_df.values.tolist()
                         ws.update("A1", updated_data)
@@ -721,7 +718,7 @@ elif menu == "⚙️ 기준정보 관리":
                 
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
-
+        
 elif menu == "📋 현장 검사 등록":
     st.title("📋 현장 검사(초/중/종물) 등록")
     st.info("💡 품명을 선택하면 등록된 스펙(기준값)이 자동으로 나타납니다.")
@@ -815,6 +812,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
