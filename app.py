@@ -454,12 +454,10 @@ elif menu == "📈 SPC 관리도":
                 df_log = pd.DataFrame(data_log[1:], columns=data_log[0])
                 df_master = pd.DataFrame(data_master[1:], columns=data_master[0])
                 
-                # 1. 분석할 부품 선택
                 part_list = df_log['품명'].unique().tolist()
                 selected_part = st.selectbox("📦 분석할 부품 선택", ["선택 안함"] + part_list)
                 
                 if selected_part != "선택 안함":
-                    # 2. 해당 부품의 '숫자형' 검사 항목만 솎아내기 (외관, 조립상태 등 글자는 그래프를 못 그리니까 제외)
                     spec_df = df_master[df_master['품명'] == selected_part]
                     numeric_items = []
                     spec_dict = {}
@@ -474,19 +472,17 @@ elif menu == "📈 SPC 관리도":
                             numeric_items.append(item)
                             spec_dict[item] = {'LSL': lsl, 'USL': usl}
                         except:
-                            pass # 숫자가 아니면 패스!
+                            pass 
                             
                     if not numeric_items:
-                        st.warning("⚠️ 이 부품에는 숫자로 측정하는 항목(중량, 두께 등)이 등록되어 있지 않습니다.")
+                        st.warning("⚠️ 이 부품에는 숫자로 측정하는 항목이 없습니다.")
                     else:
-                        # 3. 분석할 검사 항목 선택
                         selected_item = st.selectbox("📏 분석할 검사 항목 선택", ["선택 안함"] + numeric_items)
                         
                         if selected_item != "선택 안함":
                             st.markdown("---")
                             st.subheader(f"📊 {selected_part} - {selected_item} 관리도")
                             
-                            # 데이터 속에서 해당 항목 숫자만 쏙쏙 뽑아내기 로직
                             part_log = df_log[df_log['품명'] == selected_part].copy()
                             plot_data = []
                             
@@ -499,15 +495,11 @@ elif menu == "📈 SPC 관리도":
                                 for item_str in items:
                                     if ": " in item_str:
                                         k, v = item_str.split(": ", 1)
-                                        # 예: '중량-1', '중량-2' 등 선택한 항목이 포함된 값 추출
                                         if k.startswith(selected_item + "-") or k == selected_item:
-                                            try:
-                                                vals.append(float(v))
-                                            except:
-                                                pass
+                                            try: vals.append(float(v))
+                                            except: pass
                                                 
                                 if vals:
-                                    # N=3 이면 3개의 평균값을 구함 (X-bar)
                                     avg_val = sum(vals) / len(vals) 
                                     plot_data.append({"검사일시": dt, "측정값(평균)": avg_val})
                                     
@@ -516,17 +508,16 @@ elif menu == "📈 SPC 관리도":
                                 df_plot['검사일시'] = pd.to_datetime(df_plot['검사일시'])
                                 df_plot = df_plot.sort_values('검사일시')
                                 
-                                # 스펙 상한선(USL), 하한선(LSL) 라인 추가
+                                # 🌟 핵심: 시간 단위는 버리고 'YY.MM.DD' (예: 26.03.11) 형식으로 강제 변환합니다!
+                                df_plot['검사일시'] = df_plot['검사일시'].dt.strftime('%y.%m.%d')
+                                
                                 df_plot['상한선(USL)'] = spec_dict[selected_item]['USL']
                                 df_plot['하한선(LSL)'] = spec_dict[selected_item]['LSL']
                                 
-                                # 시간을 기준으로 그래프를 그리기 위해 인덱스 설정
                                 df_plot.set_index('검사일시', inplace=True)
                                 
-                                # 🌟 그래프 그리기!
                                 st.line_chart(df_plot[['상한선(USL)', '측정값(평균)', '하한선(LSL)']])
                                 
-                                # 하단 요약
                                 st.markdown("---")
                                 st.markdown(f"**📝 데이터 요약 (총 {len(df_plot)}회 검사 진행)**")
                                 c1, c2, c3 = st.columns(3)
@@ -540,7 +531,7 @@ elif menu == "📈 SPC 관리도":
                 st.info("아직 분석할 데이터가 충분하지 않습니다. 현장 검사를 진행해 주세요.")
                 
         except Exception as e:
-            st.warning("데이터를 불러오는 중 문제가 발생했습니다. (현장검사기록 시트가 있는지 확인해 주세요)")
+            st.warning("데이터를 불러오는 중 문제가 발생했습니다. (현장검사기록 탭이 있는지 확인해 주세요)")
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
@@ -909,6 +900,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
