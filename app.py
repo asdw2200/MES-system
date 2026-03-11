@@ -429,74 +429,121 @@ elif menu == "📋 검사 현황(성적서)":
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
 
-# --- [3] 📈 SPC 관리도 (평균값 적용 및 고급 차트 업그레이드) ---
 elif menu == "📈 SPC 관리도":
-    st.title("📈 SPC 관리도 (X-bar 평균 차트)")
-    st.markdown("측정된 3개의 샘플(초물/중물/종물)의 **평균값**을 계산하여 추이를 보여줍니다.")
+    st.title("📈 실시간 SPC 관리도 (X-bar 추이)")
+    st.info("💡 부품과 검사항목을 선택하면, 합격 기준(Spec)과 함께 측정값의 변화 추이를 확인합니다.")
+
+    # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
     
-    if not df.empty:
-        c1, c2, c3 = st.columns(3)
-        with c1: 
-            all_parts = sorted(list(df["품번"].unique()))
-            selected_part = st.selectbox("📦 품번 선택", all_parts)
-        with c2: 
-            inspect_item = st.selectbox("🔍 검사 항목", ["중량", "두께", "내경", "외경", "전장"])
-        with c3:
-            data_count = st.number_input("📊 최근 조회 데이터 건수", min_value=5, max_value=100, value=30)
-            
-        # 선택한 품번 데이터 필터링 (최근 데이터 순)
-        df_spc = df[df["품번"] == selected_part].copy()
-        df_spc = df_spc.sort_values(by="검사일자_dt").tail(data_count)
+    try:
+        # --- 출입증 코드 ---
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
+        client = gspread.authorize(creds)
+        doc = client.open_by_url(sheet_url)
         
-        # 🌟 핵심 기능: 1, 2, 3번 측정값의 '평균' 구하기
-        col1, col2, col3 = f"{inspect_item}1", f"{inspect_item}2", f"{inspect_item}3"
-        
-        if col1 in df_spc.columns and col2 in df_spc.columns and col3 in df_spc.columns:
-            # 안전하게 숫자로 변환 후 빈칸은 제외하고 평균 계산
-            for c in [col1, col2, col3]:
-                df_spc[c] = pd.to_numeric(df_spc[c], errors='coerce')
+        try:
+            ws_log = doc.worksheet("현장검사기록")
+            ws_master = doc.worksheet("기준정보")
             
-            # 3개 측정치의 평균을 구해 새로운 '평균값' 기둥을 만듦
-            df_spc['평균값'] = df_spc[[col1, col2, col3]].mean(axis=1, skipna=True)
-            df_spc = df_spc.dropna(subset=['평균값']) # 평균이 안 구해진 텅 빈 데이터는 제외
+            data_log = ws_log.get_all_values()
+            data_master = ws_master.get_all_values()
             
-            if not df_spc.empty:
-                # 🌟 고급 Plotly 차트 그리기
-                fig = go.Figure()
+            if len(data_log) > 1 and len(data_master) > 1:
+                df_log = pd.DataFrame(data_log[1:], columns=data_log[0])
+                df_master = pd.DataFrame(data_master[1:], columns=data_master[0])
                 
-                # 평균값 꺾은선 추가
-                fig.add_trace(go.Scatter(
-                    x=df_spc['검사일자'], 
-                    y=df_spc['평균값'],
-                    mode='lines+markers+text',
-                    name=f'{inspect_item} 평균',
-                    line=dict(color='#1A5276', width=3), # 딥블루 선
-                    marker=dict(size=10, color='#E74C3C', symbol='circle'), # 빨간색 타점
-                    text=df_spc['평균값'].round(2), # 타점 위에 소수점 2자리 평균값 표시
-                    textposition="top center",
-                    textfont=dict(size=12, color='black')
-                ))
+                # 1. 분석할 부품 선택
+                part_list = df_log['품명'].unique().tolist()
+                selected_part = st.selectbox("📦 분석할 부품 선택", ["선택 안함"] + part_list)
                 
-                # 차트 디자인 세팅
-                fig.update_layout(
-                    title=dict(text=f"<b>[{selected_part}] {inspect_item} 평균값 추이</b>", font=dict(size=20)),
-                    xaxis_title="검사 일시",
-                    yaxis_title=f"{inspect_item} 평균 측정값",
-                    template="plotly_white",
-                    hovermode="x unified", # 마우스를 올리면 예쁜 정보창이 뜸!
-                    margin=dict(l=40, r=40, t=60, b=40)
-                )
-                
-                # 화면에 예쁘게 꽉 채워서 출력
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # 계산된 상세 내역을 폴더로 숨겨둠 (필요할 때 열어볼 수 있게)
-                with st.expander("📊 평균값 계산 상세 내역 보기 (클릭하여 펼치기)"):
-                    st.dataframe(df_spc[['검사일자', '검사자', '설비번호', col1, col2, col3, '평균값']], hide_index=True)
+                if selected_part != "선택 안함":
+                    # 2. 해당 부품의 '숫자형' 검사 항목만 솎아내기 (외관, 조립상태 등 글자는 그래프를 못 그리니까 제외)
+                    spec_df = df_master[df_master['품명'] == selected_part]
+                    numeric_items = []
+                    spec_dict = {}
+                    
+                    for _, row in spec_df.iterrows():
+                        item = row['검사항목']
+                        min_v = row['최소값']
+                        max_v = row['최대값']
+                        try:
+                            lsl = float(min_v)
+                            usl = float(max_v)
+                            numeric_items.append(item)
+                            spec_dict[item] = {'LSL': lsl, 'USL': usl}
+                        except:
+                            pass # 숫자가 아니면 패스!
+                            
+                    if not numeric_items:
+                        st.warning("⚠️ 이 부품에는 숫자로 측정하는 항목(중량, 두께 등)이 등록되어 있지 않습니다.")
+                    else:
+                        # 3. 분석할 검사 항목 선택
+                        selected_item = st.selectbox("📏 분석할 검사 항목 선택", ["선택 안함"] + numeric_items)
+                        
+                        if selected_item != "선택 안함":
+                            st.markdown("---")
+                            st.subheader(f"📊 {selected_part} - {selected_item} 관리도")
+                            
+                            # 데이터 속에서 해당 항목 숫자만 쏙쏙 뽑아내기 로직
+                            part_log = df_log[df_log['품명'] == selected_part].copy()
+                            plot_data = []
+                            
+                            for _, row in part_log.iterrows():
+                                dt = row['검사일시']
+                                results_str = row['측정결과']
+                                items = results_str.split(" / ")
+                                
+                                vals = []
+                                for item_str in items:
+                                    if ": " in item_str:
+                                        k, v = item_str.split(": ", 1)
+                                        # 예: '중량-1', '중량-2' 등 선택한 항목이 포함된 값 추출
+                                        if k.startswith(selected_item + "-") or k == selected_item:
+                                            try:
+                                                vals.append(float(v))
+                                            except:
+                                                pass
+                                                
+                                if vals:
+                                    # N=3 이면 3개의 평균값을 구함 (X-bar)
+                                    avg_val = sum(vals) / len(vals) 
+                                    plot_data.append({"검사일시": dt, "측정값(평균)": avg_val})
+                                    
+                            if plot_data:
+                                df_plot = pd.DataFrame(plot_data)
+                                df_plot['검사일시'] = pd.to_datetime(df_plot['검사일시'])
+                                df_plot = df_plot.sort_values('검사일시')
+                                
+                                # 스펙 상한선(USL), 하한선(LSL) 라인 추가
+                                df_plot['상한선(USL)'] = spec_dict[selected_item]['USL']
+                                df_plot['하한선(LSL)'] = spec_dict[selected_item]['LSL']
+                                
+                                # 시간을 기준으로 그래프를 그리기 위해 인덱스 설정
+                                df_plot.set_index('검사일시', inplace=True)
+                                
+                                # 🌟 그래프 그리기!
+                                st.line_chart(df_plot[['상한선(USL)', '측정값(평균)', '하한선(LSL)']])
+                                
+                                # 하단 요약
+                                st.markdown("---")
+                                st.markdown(f"**📝 데이터 요약 (총 {len(df_plot)}회 검사 진행)**")
+                                c1, c2, c3 = st.columns(3)
+                                c1.metric("최대 측정값 (Max)", f"{df_plot['측정값(평균)'].max():.2f}")
+                                c2.metric("전체 평균값 (X-bar)", f"{df_plot['측정값(평균)'].mean():.2f}")
+                                c3.metric("최소 측정값 (Min)", f"{df_plot['측정값(평균)'].min():.2f}")
+                                
+                            else:
+                                st.info("선택한 항목에 대한 측정 데이터가 없습니다.")
             else:
-                st.warning("측정된 숫자 데이터가 없습니다. (입력 시 숫자로 넣었는지 확인해주세요)")
-        else:
-            st.error(f"데이터에 {col1}, {col2}, {col3} 항목이 없어 평균을 낼 수 없습니다.")
+                st.info("아직 분석할 데이터가 충분하지 않습니다. 현장 검사를 진행해 주세요.")
+                
+        except Exception as e:
+            st.warning("데이터를 불러오는 중 문제가 발생했습니다. (현장검사기록 시트가 있는지 확인해 주세요)")
+            
+    except Exception as e:
+        st.error(f"오류가 발생했습니다: {e}")
 
 # --- [4] 🛠️ 검교정 현황 ---
 elif menu == "🛠️ 검교정 현황":
@@ -862,6 +909,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
