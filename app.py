@@ -219,7 +219,7 @@ with st.sidebar:
     
     menu = option_menu(
         menu_title=None, 
-        options=["📊 대시보드", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고", "🛠️ 검교정 현황", "⚙️ 기준정보 관리"],
+        options=["📊 대시보드", "📋 현장 검사 등록", "📋 검사 현황(성적서)", "📈 SPC 관리도", "📥 수입자재 입고", "🛠️ 검교정 현황", "⚙️ 기준정보 관리"],
         default_index=0,
         styles={
             "container": {"padding": "5!important", "background-color": "transparent"},
@@ -685,6 +685,92 @@ elif menu == "⚙️ 기준정보 관리":
                 
     except Exception as e:
         st.error(f"오류가 발생했습니다. 출입증 키 이름이나 주소를 확인해 주세요: {e}")
+
+elif menu == "📋 현장 검사 등록":
+    st.title("📋 현장 검사(초/중/종물) 등록")
+    st.info("💡 품명을 선택하면 등록된 스펙(기준값)이 자동으로 나타납니다.")
+
+    # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
+    sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
+    
+    try:
+        # --- 출입증 코드 ---
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
+        client = gspread.authorize(creds)
+        doc = client.open_by_url(sheet_url)
+        
+        # 1. 기준정보 가져오기
+        ws_master = doc.worksheet("기준정보")
+        data = ws_master.get_all_values()
+        
+        if len(data) > 1:
+            df_master = pd.DataFrame(data[1:], columns=data[0])
+            # 품명 리스트 만들기
+            part_names = df_master["품명"].dropna().unique().tolist()
+            
+            selected_part = st.selectbox("📦 검사할 품명을 선택하세요", ["선택 안함"] + part_names)
+            
+            if selected_part != "선택 안함":
+                st.markdown("---")
+                
+                # 선택한 품번/품명 스펙 가져오기
+                spec_df = df_master[df_master["품명"] == selected_part]
+                part_num = spec_df.iloc[0]["품번"] # 해당 품번 가져오기
+                
+                st.subheader(f"🔍 [{part_num}] {selected_part} 검사 입력")
+                
+                # --- 폼(Form) 시작: 한 번에 묶어서 저장 ---
+                with st.form("inspection_form"):
+                    c1, c2 = st.columns(2)
+                    inspector = c1.text_input("👨‍🔧 검사자 이름 (예: 홍길동)")
+                    insp_type = c2.selectbox("🏷️ 검사 구분", ["초물", "중물", "종물"])
+                    
+                    st.markdown("##### 📝 측정 항목 입력")
+                    results = {}
+                    
+                    # 🌟 마법의 기능: 기준정보에 등록된 항목만큼 입력칸이 자동으로 생김!
+                    for index, row in spec_df.iterrows():
+                        item = row["검사항목"]
+                        min_v = row["최소값"]
+                        max_v = row["최대값"]
+                        
+                        # 합격/불합격(텍스트)인지 숫자인지 대략 구분해서 입력칸 다르게 보여주기
+                        if str(min_v).upper() in ["OK", "합격", "양호", "무", "유"]:
+                            results[item] = st.selectbox(f"👀 {item} (기준: {min_v})", ["OK", "NG"])
+                        else:
+                            results[item] = st.text_input(f"📏 {item} (기준: {min_v} ~ {max_v})", placeholder="측정값을 입력하세요")
+                            
+                    # 저장 버튼
+                    submit_btn = st.form_submit_button("💾 검사 결과 저장", type="primary", use_container_width=True)
+                    
+                    if submit_btn:
+                        if not inspector:
+                            st.error("⚠️ 검사자 이름을 입력해 주세요!")
+                        else:
+                            with st.spinner("구글 시트에 안전하게 저장 중입니다..."):
+                                # 결과를 하나의 깔끔한 문장으로 묶기 (예: 중량: 33.5 / 외관: OK)
+                                result_str = " / ".join([f"{k}: {v}" for k, v in results.items()])
+                                
+                                # 구글 시트에 '현장검사기록' 탭이 없으면 파이썬이 알아서 만듦!
+                                try:
+                                    ws_log = doc.worksheet("현장검사기록")
+                                except:
+                                    ws_log = doc.add_worksheet(title="현장검사기록", rows="1000", cols="10")
+                                    ws_log.append_row(["검사일시", "검사구분", "품번", "품명", "검사자", "측정결과"])
+                                    
+                                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                new_row = [now, insp_type, part_num, selected_part, inspector, result_str]
+                                ws_log.append_row(new_row)
+                                
+                                st.success("✅ 검사 결과가 성공적으로 저장되었습니다!")
+                                st.balloons() # 축하 풍선 효과! 🎉
+                                
+        else:
+            st.warning("⚠️ 등록된 기준정보가 없습니다. [⚙️ 기준정보 관리]에서 먼저 부품을 등록해 주세요.")
+            
+    except Exception as e:
+        st.error(f"오류가 발생했습니다: {e}")
 
 
 
