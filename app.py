@@ -664,7 +664,7 @@ elif menu == "⚙️ 기준정보 관리":
         st.markdown("---")
         
         # ==========================================
-        # 🌟 2. 기존 부품 스펙 조회 및 심플 수정 (검색 기능 추가!)
+        # 🌟 2. 기존 부품 스펙 조회 및 심플 수정
         # ==========================================
         st.markdown("### 📋 등록된 부품 스펙 수정")
         
@@ -672,17 +672,9 @@ elif menu == "⚙️ 기준정보 관리":
             df_master["부품식별"] = df_master["차종"] + " | " + df_master["품번"] + " | " + df_master["품명"]
             part_list = df_master["부품식별"].unique().tolist()
             
-            # 🌟 검색창 추가!
-            search_keyword = st.text_input("🔍 품번 또는 품명 검색 (검색어를 입력하면 아래 목록이 줄어듭니다)", placeholder="예: GX900 또는 HOSE")
-            
-            # 검색어가 있으면 필터링, 없으면 전체 목록
-            if search_keyword:
-                filtered_list = [p for p in part_list if search_keyword.lower() in p.lower() or search_keyword.replace(" ", "") in p.replace(" ", "")]
-            else:
-                filtered_list = part_list
-            
-            # 필터링된 목록을 드롭다운에 띄우기
-            selected_target = st.selectbox("🛠️ 수정할 부품을 선택하세요", ["선택 안함"] + filtered_list)
+            # 🌟 검색창을 없애고, 드롭다운 자체를 검색기로 활용합니다!
+            st.caption("💡 아래 선택 상자를 클릭하고 **'품번'이나 '품명'을 키보드로 입력**하시면 자동 검색됩니다!")
+            selected_target = st.selectbox("🔍 수정할 부품 검색 및 선택", ["선택 안함"] + part_list)
             
             if selected_target != "선택 안함":
                 target_df = df_master[df_master["부품식별"] == selected_target].copy()
@@ -812,6 +804,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
