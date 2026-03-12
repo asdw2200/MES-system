@@ -885,7 +885,12 @@ elif menu == "📋 현장 검사 등록":
                                 pass # 혹시 주소 모양이 다르면 그냥 원본 유지
                                 
                         try:
-                            st.image(raw_url, use_container_width=True) 
+                            # 🌟 [업데이트] use_container_width를 지우고, width=400 을 넣어서 크기를 고정합니다!
+                            # 사용자가 클릭하면 크게 볼 수 있으니, 평소엔 아담하게 띄우는 게 좋습니다.
+                            st.image(raw_url, width=400) 
+                            st.caption("💡 사진이 작아 보이면 손가락으로 줌인(확대)해서 보세요.") # 깨알 팁 추가
+                        except:
+                            # ... (기존 에러 메시지 생략) ... 
                         except:
                             st.warning("⚠️ 사진을 불러올 수 없습니다. (💡팁: 구글 드라이브 사진의 접근 권한이 '링크가 있는 모든 사용자'로 되어 있는지 확인해주세요!)")
                 
@@ -954,6 +959,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
