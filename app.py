@@ -741,11 +741,9 @@ elif menu == "⚙️ 기준정보 관리":
         if len(data) > 1:
             df_master = pd.DataFrame(data[1:], columns=data[0])
         else:
-            df_master = pd.DataFrame(columns=["차종", "품번", "품명", "검사항목", "시료수", "최소값", "최대값"])
+            # 🌟 도면링크 열이 포함된 기본 틀
+            df_master = pd.DataFrame(columns=["차종", "품번", "품명", "도면링크", "검사항목", "시료수", "최소값", "최대값"])
             
-        # ==========================================
-        # 🌟 1. 스마트 간편 등록기
-        # ==========================================
         st.markdown("### 🚀 신규 부품 간편 등록")
         st.info("💡 차종, 품번, 품명을 딱 한 번만 입력하고, 아래 항목만 적으세요.")
         
@@ -755,10 +753,13 @@ elif menu == "⚙️ 기준정보 관리":
             new_part_num = c2.text_input("🔢 품번 (예: 97390-GX900)")
             new_part_name = c3.text_input("📦 품명 (예: HOSE-SD DEFROSTER RH)")
             
+            # 🌟 [업데이트] 사진 URL 입력칸을 아주 넓게 뺐습니다!
+            new_img_link = st.text_input("🔗 검사 도면/사진 주소(URL)", placeholder="인터넷이나 구글 드라이브의 이미지 주소를 복사해서 붙여넣으세요! (선택사항)") 
+            
             empty_items = pd.DataFrame([
                 {"검사항목": "중량", "시료수": 3, "최소값": "", "최대값": ""},
                 {"검사항목": "두께", "시료수": 3, "최소값": "", "최대값": ""},
-                {"검사항목": "외관", "시료수": 3, "최소값": "BURR 없을 것", "최대값": ""},
+                {"검사항목": "외관(BURR)", "시료수": 3, "최소값": "OK", "최대값": ""},
                 {"검사항목": "", "시료수": 3, "최소값": "", "최대값": ""},
                 {"검사항목": "", "시료수": 3, "최소값": "", "최대값": ""}
             ])
@@ -776,7 +777,8 @@ elif menu == "⚙️ 기준정보 관리":
                         with st.spinner("저장 중..."):
                             new_rows = []
                             for _, row in valid_items.iterrows():
-                                new_rows.append([new_car, new_part_num, new_part_name, row["검사항목"], row["시료수"], row["최소값"], row["최대값"]])
+                                # 🌟 저장할 때 도면링크(new_img_link)도 같이 시트에 저장됩니다!
+                                new_rows.append([new_car, new_part_num, new_part_name, new_img_link, row["검사항목"], row["시료수"], row["최소값"], row["최대값"]])
                             for row in new_rows:
                                 ws.append_row(row)
                             st.success(f"✅ {new_part_name} 부품 기준정보 등록 완료!")
@@ -785,21 +787,21 @@ elif menu == "⚙️ 기준정보 관리":
                             
         st.markdown("---")
         
-        # ==========================================
-        # 🌟 2. 기존 부품 스펙 조회 및 심플 수정
-        # ==========================================
         st.markdown("### 📋 등록된 부품 스펙 수정")
         
         if not df_master.empty:
             df_master["부품식별"] = df_master["차종"] + " | " + df_master["품번"] + " | " + df_master["품명"]
             part_list = df_master["부품식별"].unique().tolist()
             
-            # 🌟 검색창을 없애고, 드롭다운 자체를 검색기로 활용합니다!
             st.caption("💡 아래 선택 상자를 클릭하고 **'품번'이나 '품명'을 키보드로 입력**하시면 자동 검색됩니다!")
             selected_target = st.selectbox("🔍 수정할 부품 검색 및 선택", ["선택 안함"] + part_list)
             
             if selected_target != "선택 안함":
                 target_df = df_master[df_master["부품식별"] == selected_target].copy()
+                
+                # 기존 부품의 사진 주소를 수정할 수 있는 칸
+                current_link = target_df.iloc[0].get("도면링크", "") if "도면링크" in target_df.columns else ""
+                edit_img_link = st.text_input("🔗 도면/사진 링크 (수정 가능)", value=current_link)
                 
                 st.markdown(f"**🔍 [{selected_target}] 검사 항목 수정**")
                 edit_df = target_df[["검사항목", "시료수", "최소값", "최대값"]]
@@ -812,6 +814,8 @@ elif menu == "⚙️ 기준정보 관리":
                         df_master_new = df_master[df_master["부품식별"] != selected_target].copy()
                         
                         car, p_num, p_name = selected_target.split(" | ")
+                        
+                        valid_edited.insert(0, "도면링크", edit_img_link)
                         valid_edited.insert(0, "품명", p_name)
                         valid_edited.insert(0, "품번", p_num)
                         valid_edited.insert(0, "차종", car)
@@ -824,7 +828,7 @@ elif menu == "⚙️ 기준정보 관리":
                         updated_data = [final_df.columns.values.tolist()] + final_df.values.tolist()
                         ws.update("A1", updated_data)
                         
-                        st.success("✅ 스펙 수정이 완벽하게 반영되었습니다!")
+                        st.success("✅ 스펙 및 사진 주소 수정이 완벽하게 반영되었습니다!")
                         st.cache_data.clear() 
                         st.rerun()
         else:
@@ -941,6 +945,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
