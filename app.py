@@ -867,18 +867,27 @@ elif menu == "📋 현장 검사 등록":
                 st.subheader(f"🔍 [{part_num}] {selected_part} 검사 입력")
                 
                 # ==========================================
-                # 🌟 [업데이트] 도면/사진 바로 띄우기! (클릭 안함)
+                # 🌟 [업데이트] 구글 드라이브 링크 자동 번역기 장착!
                 # ==========================================
                 if "도면링크" in spec_df.columns:
                     img_url = spec_df.iloc[0]["도면링크"]
                     if pd.notna(img_url) and str(img_url).strip() != "":
-                        # 👇 expander를 제거하고 제목과 사진을 바로 보여줍니다.
                         st.markdown("##### 📷 검사 부위 도면/사진") 
+                        
+                        raw_url = str(img_url).strip()
+                        
+                        # 구글 드라이브 링크가 들어오면, 파이썬이 알아서 '직접 다운로드(이미지)' 링크로 뜯어고칩니다!
+                        if "drive.google.com/file/d/" in raw_url:
+                            try:
+                                file_id = raw_url.split("/d/")[1].split("/")[0]
+                                raw_url = f"https://drive.google.com/uc?export=view&id={file_id}"
+                            except:
+                                pass # 혹시 주소 모양이 다르면 그냥 원본 유지
+                                
                         try:
-                            # 화면 너비에 맞춰 띄웁니다.
-                            st.image(str(img_url), use_container_width=True) 
+                            st.image(raw_url, use_container_width=True) 
                         except:
-                            st.warning("⚠️ 이미지 주소가 올바르지 않아 사진을 불러올 수 없습니다.")
+                            st.warning("⚠️ 사진을 불러올 수 없습니다. (💡팁: 구글 드라이브 사진의 접근 권한이 '링크가 있는 모든 사용자'로 되어 있는지 확인해주세요!)")
                 
                 with st.form("inspection_form"):
                     c1, c2, c3 = st.columns(3)
@@ -945,6 +954,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
