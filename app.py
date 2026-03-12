@@ -741,7 +741,6 @@ elif menu == "⚙️ 기준정보 관리":
         if len(data) > 1:
             df_master = pd.DataFrame(data[1:], columns=data[0])
         else:
-            # 🌟 도면링크 열이 포함된 기본 틀
             df_master = pd.DataFrame(columns=["차종", "품번", "품명", "도면링크", "검사항목", "시료수", "최소값", "최대값"])
             
         st.markdown("### 🚀 신규 부품 간편 등록")
@@ -753,7 +752,6 @@ elif menu == "⚙️ 기준정보 관리":
             new_part_num = c2.text_input("🔢 품번 (예: 97390-GX900)")
             new_part_name = c3.text_input("📦 품명 (예: HOSE-SD DEFROSTER RH)")
             
-            # 🌟 [업데이트] 사진 URL 입력칸을 아주 넓게 뺐습니다!
             new_img_link = st.text_input("🔗 검사 도면/사진 주소(URL)", placeholder="인터넷이나 구글 드라이브의 이미지 주소를 복사해서 붙여넣으세요! (선택사항)") 
             
             empty_items = pd.DataFrame([
@@ -777,7 +775,6 @@ elif menu == "⚙️ 기준정보 관리":
                         with st.spinner("저장 중..."):
                             new_rows = []
                             for _, row in valid_items.iterrows():
-                                # 🌟 저장할 때 도면링크(new_img_link)도 같이 시트에 저장됩니다!
                                 new_rows.append([new_car, new_part_num, new_part_name, new_img_link, row["검사항목"], row["시료수"], row["최소값"], row["최대값"]])
                             for row in new_rows:
                                 ws.append_row(row)
@@ -787,28 +784,51 @@ elif menu == "⚙️ 기준정보 관리":
                             
         st.markdown("---")
         
-        st.markdown("### 📋 등록된 부품 스펙 수정")
+        st.markdown("### 📋 등록된 부품 관리 (수정 및 삭제)")
         
         if not df_master.empty:
             df_master["부품식별"] = df_master["차종"] + " | " + df_master["품번"] + " | " + df_master["품명"]
             part_list = df_master["부품식별"].unique().tolist()
             
             st.caption("💡 아래 선택 상자를 클릭하고 **'품번'이나 '품명'을 키보드로 입력**하시면 자동 검색됩니다!")
-            selected_target = st.selectbox("🔍 수정할 부품 검색 및 선택", ["선택 안함"] + part_list)
+            selected_target = st.selectbox("🔍 수정/삭제할 부품 검색 및 선택", ["선택 안함"] + part_list)
             
             if selected_target != "선택 안함":
                 target_df = df_master[df_master["부품식별"] == selected_target].copy()
                 
+                # 🌟 [업데이트] 제목 옆에 깔끔하게 삭제 버튼 배치!
+                c1, c2 = st.columns([7, 3])
+                with c1:
+                    st.markdown(f"**🔍 [{selected_target}] 상세 정보**")
+                with c2:
+                    if st.button("🗑️ 이 부품 완전 삭제", use_container_width=True):
+                        with st.spinner("구글 시트에서 완전히 삭제 중입니다..."):
+                            # 선택된 부품만 제외하고 새로운 표 만들기
+                            df_master_new = df_master[df_master["부품식별"] != selected_target].copy()
+                            if "부품식별" in df_master_new.columns:
+                                df_master_new = df_master_new.drop(columns=["부품식별"])
+                            
+                            ws.clear()
+                            if not df_master_new.empty:
+                                updated_data = [df_master_new.columns.values.tolist()] + df_master_new.values.tolist()
+                                ws.update("A1", updated_data)
+                            else:
+                                # 데이터가 다 지워졌을 때 뼈대(제목)만 남겨두기
+                                ws.update("A1", [["차종", "품번", "품명", "도면링크", "검사항목", "시료수", "최소값", "최대값"]])
+                            
+                            st.success("✅ 선택한 부품 정보가 완벽하게 삭제되었습니다!")
+                            st.cache_data.clear()
+                            st.rerun()
+
                 # 기존 부품의 사진 주소를 수정할 수 있는 칸
                 current_link = target_df.iloc[0].get("도면링크", "") if "도면링크" in target_df.columns else ""
                 edit_img_link = st.text_input("🔗 도면/사진 링크 (수정 가능)", value=current_link)
                 
-                st.markdown(f"**🔍 [{selected_target}] 검사 항목 수정**")
                 edit_df = target_df[["검사항목", "시료수", "최소값", "최대값"]]
                 
                 edited_spec = st.data_editor(edit_df, num_rows="dynamic", hide_index=True, use_container_width=True)
                 
-                if st.button("🔄 이 부품의 스펙만 업데이트하기", use_container_width=True):
+                if st.button("🔄 이 부품의 스펙만 업데이트하기", type="primary", use_container_width=True):
                     with st.spinner("구글 시트에 업데이트 중입니다..."):
                         valid_edited = edited_spec[edited_spec["검사항목"].str.strip() != ""]
                         df_master_new = df_master[df_master["부품식별"] != selected_target].copy()
@@ -958,6 +978,7 @@ elif menu == "📋 현장 검사 등록":
             
     except Exception as e:
         st.error(f"오류가 발생했습니다: {e}")
+
 
 
 
