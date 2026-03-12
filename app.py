@@ -835,7 +835,7 @@ elif menu == "⚙️ 기준정보 관리":
         
 elif menu == "📋 현장 검사 등록":
     st.title("📋 현장 검사(초/중/종물) 등록")
-    st.info("💡 품명을 선택하면 등록된 스펙(기준값)이 자동으로 나타납니다.")
+    st.info("💡 품명을 선택하면 등록된 스펙(기준값) 및 검사 부위 사진이 자동으로 나타납니다.")
 
     # 🚨 여기에 관리자님의 진짜 구글 시트 주소 넣기!
     sheet_url = "https://docs.google.com/spreadsheets/d/1fh1XlF7Z1tlQQV7zFUql5gjv-veBgItjm0Hb2vfIEo8/edit?gid=1166124159#gid=1166124159" 
@@ -862,11 +862,24 @@ elif menu == "📋 현장 검사 등록":
                 
                 st.subheader(f"🔍 [{part_num}] {selected_part} 검사 입력")
                 
+                # ==========================================
+                # 🌟 [업데이트] 도면/사진 바로 띄우기! (클릭 안함)
+                # ==========================================
+                if "도면링크" in spec_df.columns:
+                    img_url = spec_df.iloc[0]["도면링크"]
+                    if pd.notna(img_url) and str(img_url).strip() != "":
+                        # 👇 expander를 제거하고 제목과 사진을 바로 보여줍니다.
+                        st.markdown("##### 📷 검사 부위 도면/사진") 
+                        try:
+                            # 화면 너비에 맞춰 띄웁니다.
+                            st.image(str(img_url), use_container_width=True) 
+                        except:
+                            st.warning("⚠️ 이미지 주소가 올바르지 않아 사진을 불러올 수 없습니다.")
+                
                 with st.form("inspection_form"):
-                    # 🌟 1. 가로를 3칸으로 나누고 첫 번째 칸에 달력(날짜)을 넣습니다!
                     c1, c2, c3 = st.columns(3)
                     
-                    insp_date = c1.date_input("📅 검사 일자") # 기본값은 오늘 날짜로 뜹니다
+                    insp_date = c1.date_input("📅 검사 일자") 
                     
                     inspector_list = ["선택 안함", "함인철", "홍길동", "김철수", "김윤곤"] 
                     inspector = c2.selectbox("👨‍🔧 검사자 이름", inspector_list)
@@ -914,7 +927,6 @@ elif menu == "📋 현장 검사 등록":
                                     ws_log = doc.add_worksheet(title="현장검사기록", rows="1000", cols="10")
                                     ws_log.append_row(["검사일시", "검사구분", "품번", "품명", "검사자", "측정결과"])
                                     
-                                # 🌟 2. 선택한 날짜에 현재 시간(시:분:초)을 조합해서 저장합니다.
                                 current_time = datetime.now().strftime("%H:%M:%S")
                                 saved_datetime = f"{insp_date.strftime('%Y-%m-%d')} {current_time}"
                                 
